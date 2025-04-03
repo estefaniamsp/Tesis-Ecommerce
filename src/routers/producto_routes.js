@@ -6,15 +6,15 @@ import {
     updateProductoController, 
     deleteProductoController 
 } from '../controllers/producto_controller.js';
-import auth_admin from '../middlewares/auth_admin.js';
+import verificarAutenticacion from '../middlewares/auth.js';
 import { validarProducto, manejarErrores } from '../middlewares/validacionForms.js';
 
 const router = Router();
 
 router.get('/productos', getAllProductosController);
 router.get('/productos/:id', getProductoByIDController);
-router.post('/productos', auth_admin, validarProducto, manejarErrores, createProductoController);
-router.put('/productos/:id', auth_admin, updateProductoController);
-router.delete('/productos/:id', auth_admin, deleteProductoController);
+router.post('/productos', verificarAutenticacion, validarProducto, manejarErrores, createProductoController);
+router.put('/productos/:id', verificarAutenticacion, updateProductoController);
+router.delete('/productos/:id', verificarAutenticacion, deleteProductoController);
 
 export default router;

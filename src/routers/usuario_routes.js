@@ -7,6 +7,7 @@ import {
     updateUserProfile,
     recuperarContrasenia,
     cambiarContrasenia,
+    confirmarEmail
 } from "../controllers/usuario_controller.js"
 import verificarAutenticacion from '../middlewares/auth.js'; 
 import { validarUsuario, manejarErrores } from '../middlewares/validacionForms.js';
@@ -17,9 +18,8 @@ router.post("/registro", validarUsuario, manejarErrores, registerUser);
 router.put("/perfil/:id", verificarAutenticacion, updateUserProfile);
 router.post("/recuperar-contrasenia",verificarAutenticacion, recuperarContrasenia);
 router.post("/cambiar-contrasenia", verificarAutenticacion, cambiarContrasenia);
-router.post("/logout", (req, res) => {
-    res.status(200).json({ msg: "Sesión cerrada exitosamente." });
-});
+router.get('/confirmar/:token', confirmarEmail);
+router.post("/logout", (req, res) => {res.status(200).json({ msg: "Sesión cerrada exitosamente." });});
 
 // Exportar la variable router
 export default router  

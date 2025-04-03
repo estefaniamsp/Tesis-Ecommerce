@@ -2,28 +2,70 @@ import Usuario from "../models/usuarios.js";
 import generarJWT from "../T_helpers/crearJWT.js";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
+import mongoose from "mongoose";
 
 // Registrar usuario
 const registerUser = async (req, res) => {
-    const { email, password } = req.body;
+    const { nombre, apellido, genero, email, password } = req.body;
 
-    if (Object.values(req.body).includes("")) {
-        return res.status(400).json({ msg: "Lo sentimos, debes llenar todos los campos" });
+    // Verificar que no haya campos vacíos
+    if (!nombre || !apellido || !genero || !email || !password) {
+        return res.status(400).json({ msg: "Todos los campos son obligatorios" });
     }
 
+    // Verificar si el email ya está registrado
     const verificarEmailBDD = await Usuario.findOne({ email });
 
     if (verificarEmailBDD) {
-        return res.status(400).json({ msg: "Lo sentimos, el email ya se encuentra registrado" });
+        return res.status(400).json({ msg: "El email ya se encuentra registrado" });
     }
 
-    const nuevoUsuario = new Usuario(req.body);
-    nuevoUsuario.password = await nuevoUsuario.encrypPassword(password);
-    await nuevoUsuario.save();
-    delete nuevoUsuario.password;
+    try {
+        // Crear nuevo usuario con todos los campos
+        const nuevoUsuario = new Usuario({ nombre, apellido, genero, email, password });
 
-    res.status(200).json({ msg: "Registro exitoso, ya puedes hacer login" });
+        // Encriptar la contraseña
+        nuevoUsuario.password = await nuevoUsuario.encryptPassword(password);
+        const token = nuevoUsuario.crearToken()
+        await sendMailToUser(email,token)
+        await nuevoUsuario.save();
+        res.status(200).json({msg:"Revisa tu correo electrónico para confirmar tu cuenta"})
+
+        // Excluir la contraseña antes de enviar la respuesta
+        const { password: _, ...usuarioSinPassword } = nuevoUsuario.toObject();
+
+        res.status(200).json({ msg: "Registro exitoso, ya puedes hacer login", usuario: usuarioSinPassword });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ msg: "Error al registrar el usuario" });
+    }
 };
+
+//  Verificar correo de confirmación
+const confirmarEmail = async (req, res) => {
+    const { token } = req.params;
+
+    if (!token) {
+        return res.status(400).json({ msg: "Token no proporcionado" });
+    }
+
+    try {
+        const usuario = await Usuario.findOne({ token });
+
+        if (!usuario) {
+            return res.status(404).json({ msg: "Token inválido o expirado" });
+        }
+
+        usuario.confirmado = true;
+        usuario.token = null; // Limpiar el token
+        await usuario.save();
+
+        res.status(200).json({ msg: "Correo confirmado exitosamente" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ msg: "Error al confirmar el correo" });
+    }
+}
 
 // Iniciar sesión
 const loginUser = async (req, res) => {
@@ -35,8 +77,8 @@ const loginUser = async (req, res) => {
 
     const UsuarioBDD = await Usuario.findOne({ email });
 
-    if (!UsuarioBDD) {
-        return res.status(404).json({ msg: "Usuario o contraseña incorrectos." });
+    if (!UsuarioBDD || !(await UsuarioBDD.matchPassword(password))) {
+        return res.status(401).json({ msg: "Credenciales inválidas" });
     }
 
     const verificarPassword = await UsuarioBDD.matchPassword(password);
@@ -45,14 +87,16 @@ const loginUser = async (req, res) => {
         return res.status(404).json({ msg: "Usuario o contraseña incorrectos." });
     }
 
-    const token = generarJWT(UsuarioBDD._id, UsuarioBDD.nombre);
+    const token = generarJWT(UsuarioBDD._id, "usuario");
 
-    const { nombre, apellido, _id } = UsuarioBDD;
+    const { nombre, apellido, genero, rol, _id } = UsuarioBDD;
 
     res.status(200).json({
         token,
         nombre,
         apellido,
+        genero,
+        rol,
         email: UsuarioBDD.email,
         _id,
     });
@@ -61,10 +105,10 @@ const loginUser = async (req, res) => {
 // Modificar perfil de usuario
 const updateUserProfile = async (req, res) => {
     const id = req.UsuarioBDD._id; // ID autenticado
-    const { nombre, apellido, email } = req.body;
+    const { nombre, apellido, genero, email } = req.body;
 
-    if (!nombre && !apellido && !email) {
-        return res.status(400).json({ msg: "Debes enviar al menos un campo para actualizar" });
+    if (Object.keys(req.body).length === 0) {
+        return res.status(400).json({ msg: "No hay datos para actualizar" });
     }
 
     try {
@@ -76,12 +120,13 @@ const updateUserProfile = async (req, res) => {
         if (email && email !== usuario.email) {
             const emailExistente = await Usuario.findOne({ email });
             if (emailExistente) {
-                return res.status(400).json({ msg: "El email ya está registrado con otro usuario" });
+                return res.status(400).json({ msg: "El email ya está en uso" });
             }
         }
 
         usuario.nombre = nombre ?? usuario.nombre;
         usuario.apellido = apellido ?? usuario.apellido;
+        usuario.genero = genero ?? usuario.genero;
         usuario.email = email ?? usuario.email;
 
         await usuario.save();
@@ -106,6 +151,8 @@ const recuperarContrasenia = async (req, res) => {
         }
 
         const codigoRecuperacion = Math.floor(100000 + Math.random() * 900000);
+        usuario.codigoRecuperacion = codigoRecuperacion;
+        await usuario.save();
 
         const transporter = nodemailer.createTransport({
             service: "gmail",
@@ -130,17 +177,17 @@ const recuperarContrasenia = async (req, res) => {
 
 // Cambiar contraseña
 const cambiarContrasenia = async (req, res) => {
-    const { email, nuevaPassword } = req.body;
+    const { email, nuevaPassword, codigoRecuperacion } = req.body;
 
     try {
         const usuario = await Usuario.findOne({ email });
 
-        if (!usuario) {
-            return res.status(404).json({ msg: "Usuario no encontrado" });
+        if (!usuario || usuario.codigoRecuperacion !== codigoRecuperacion) {
+            return res.status(400).json({ msg: "Código de recuperación incorrecto" });
         }
 
-        const salt = await bcrypt.genSalt(10);
-        usuario.password = await bcrypt.hash(nuevaPassword, salt);
+        usuario.password = await bcrypt.hash(nuevaPassword, 10);
+        usuario.codigoRecuperacion = null; 
         await usuario.save();
 
         res.json({ msg: "Contraseña cambiada con éxito" });
@@ -154,5 +201,6 @@ export {
     loginUser,
     updateUserProfile,
     recuperarContrasenia,
-    cambiarContrasenia
+    cambiarContrasenia,
+    confirmarEmail
 };

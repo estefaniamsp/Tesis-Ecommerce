@@ -23,4 +23,5 @@ AdminSchema.methods.compararPassword = async function (password) {
 };
 
 const Admin = mongoose.model("Admin", AdminSchema);
+
 export default Admin;

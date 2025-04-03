@@ -28,6 +28,15 @@ const usuarioSchema = new Schema(
       maxLength: 30,
       unique: true,
     },
+    codigoRecuperacion: {
+      type: Number,
+      default: null,
+    },
+    rol: {  
+      type: String,
+      enum: ['admin', 'cliente'],
+      default: 'cliente',
+    },
     password: {
       type: String,
       required: true,
@@ -38,15 +47,21 @@ const usuarioSchema = new Schema(
   }
 );
 
-usuarioSchema.methods.encrypPassword = async function (password) {
+usuarioSchema.methods.encryptPassword = async function (password) {
   const salt = await bcrypt.genSalt(10);
-  const passwordEncryp = await bcrypt.hash(password, salt);
-  return passwordEncryp;
+  return await bcrypt.hash(password, salt);
 };
 
+// Método para comparar contraseñas
 usuarioSchema.methods.matchPassword = async function (password) {
-  const response = await bcrypt.compare(password, this.password);
-  return response;
+  return await bcrypt.compare(password, this.password);
 };
 
-export default model("usuarios", usuarioSchema);
+// Método para crear un token
+usuarioSchema.methods.createToken = function () {
+  const tokenGenerado  = this.token = Math.random().toString(36).slice(2)
+  return tokenGenerado
+};
+
+const Usuarios = mongoose.model("Usuarios", usuarioSchema);
+export default Usuarios
