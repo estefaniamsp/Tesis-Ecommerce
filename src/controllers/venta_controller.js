@@ -1,12 +1,12 @@
-import Venta from "../models/ventas.js";
-import Producto from "../models/productos.js";
-import Cliente from "../models/clientes.js";
+import Ventas from "../models/ventas.js";
+import Productos from "../models/productos.js";
+import Clientes from "../models/clientes.js";
 import mongoose from "mongoose";
 
 // Obtener todas las ventas
 const getAllVentasController = async (req, res) => {
   try {
-    const ventas = await Venta.find().populate("cliente", "nombre apellido email").populate("productos.producto", "nombre descripcion precio");
+    const ventas = await Ventas.find().populate("cliente", "nombre apellido email").populate("productos.producto", "nombre descripcion precio");
     res.status(200).json(ventas);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -17,7 +17,7 @@ const getAllVentasController = async (req, res) => {
 const getVentaByIDController = async (req, res) => {
   const { id } = req.params;
   try {
-    const venta = await Venta.findById(id)
+    const venta = await Ventas.findById(id)
       .populate("cliente", "nombre apellido email")
       .populate("productos.producto", "nombre descripcion precio");
 
@@ -30,7 +30,7 @@ const getVentaByIDController = async (req, res) => {
 
 // Crear una nueva venta
 const createVentaController = async (req, res) => {
-  const { cliente, productos } = req.body;
+  const { clienteId, productos } = req.body;
 
   // Verificar si hay campos vacíos
   if (Object.values(req.body).includes("")) {
@@ -39,7 +39,7 @@ const createVentaController = async (req, res) => {
 
   try {
     // Verificar si el cliente existe
-    const clienteExistente = await Cliente.findById(cliente);
+    const clienteExistente = await Clientes.findById(clienteId);
     if (!clienteExistente) {
       return res.status(404).json({ msg: "Cliente no encontrado" });
     }
@@ -49,7 +49,7 @@ const createVentaController = async (req, res) => {
     const productosConDetalles = [];
 
     for (let i = 0; i < productos.length; i++) {
-      const producto = await Producto.findById(productos[i].producto);
+      const producto = await Productos.findById(productos[i].producto);
 
       if (!producto) {
         return res.status(404).json({ msg: `Producto con ID ${productos[i].producto} no encontrado.` });
@@ -67,7 +67,7 @@ const createVentaController = async (req, res) => {
     }
 
     // Crear y guardar la nueva venta
-    const nuevaVenta = new Venta({
+    const nuevaVenta = new Ventas({
       cliente: clienteExistente._id,
       productos: productosConDetalles,
       total: totalVenta,
@@ -98,7 +98,7 @@ const updateVentaController = async (req, res) => {
 
   try {
     // Actualizar la venta
-    const ventaActualizada = await Venta.findByIdAndUpdate(id, { estado }, { new: true });
+    const ventaActualizada = await Ventas.findByIdAndUpdate(id, { estado }, { new: true });
 
     if (!ventaActualizada) {
       return res.status(404).json({ msg: "Venta no encontrada" });
@@ -121,7 +121,7 @@ const deleteVentaController = async (req, res) => {
 
   try {
     // Eliminar la venta
-    const ventaEliminada = await Venta.findByIdAndDelete(id);
+    const ventaEliminada = await Ventas.findByIdAndDelete(id);
 
     if (!ventaEliminada) {
       return res.status(404).json({ msg: "Venta no encontrada" });

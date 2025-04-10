@@ -3,14 +3,14 @@ import mongoose from 'mongoose';
 const carritoSchema = new mongoose.Schema({
     cliente: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Cliente',
+        ref: 'Clientes',
         required: true
     },
     productos: [
         {
             producto: {
                 type: mongoose.Schema.Types.ObjectId,
-                ref: 'Producto',
+                ref: 'Productos',
                 required: true
             },
             cantidad: {
@@ -38,8 +38,8 @@ const carritoSchema = new mongoose.Schema({
     },
     estado: {
         type: String,
-        enum: ['activo', 'finalizado', 'abandonado'],
-        default: 'activo'
+        enum: ['pendiente', 'finalizado', 'cancelado'],
+        default: 'pendiente'
     }
 });
 
@@ -59,6 +59,6 @@ carritoSchema.pre('save', function(next) {
     next();
 });
 
-const Carrito = mongoose.model('Carrito', carritoSchema);
+const Carrito = mongoose.model('Carritos', carritoSchema);
 
 export default Carrito;

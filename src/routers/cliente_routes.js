@@ -1,22 +1,25 @@
 import {Router} from 'express'
-import { 
-    getAllClientesController, 
-    getClienteByIDController, 
-    createClienteController, 
-    updateClienteController, 
-    deleteClienteController 
-} from '../controllers/cliente_controller.js'
-import  verificarAutenticacion  from '../middlewares/auth.js'
+const router = Router()
+// Importar los métodos del controlador 
+import {
+    loginCliente,
+    registerCliente,
+    updateClienteProfile,
+    recuperarContrasenia,
+    cambiarContrasenia,
+    confirmEmail
+} from "../controllers/cliente_controller.js"
+import verificarAutenticacion from '../middlewares/auth.js'; 
 import { validarCliente, manejarErrores } from '../middlewares/validacionForms.js';
 
-const router = Router()
+// Rutas publicas
+router.post("/login", loginCliente);
+router.post("/registro", validarCliente, manejarErrores, registerCliente);
+router.put("/perfil/:id", verificarAutenticacion, updateClienteProfile);
+router.post("/recuperar-contrasenia",verificarAutenticacion, recuperarContrasenia);
+router.post("/cambiar-contrasenia", verificarAutenticacion, cambiarContrasenia);
+router.get('/confirmar/:token', confirmEmail);
+router.post("/logout", (req, res) => {res.status(200).json({ msg: "Sesión cerrada exitosamente." });});
 
-
-router.get('/clientes',getAllClientesController)
-router.get('/clientes/:id',getClienteByIDController)
-router.post('/clientes',verificarAutenticacion, validarCliente, manejarErrores, createClienteController)
-router.put('/clientes',verificarAutenticacion, updateClienteController)
-router.delete('/clientes',verificarAutenticacion, deleteClienteController)
-
-
-export default router
+// Exportar la variable router
+export default router  

@@ -10,7 +10,6 @@ const productoSchema = new Schema(
     },
     descripcion: {
       type: String,
-      required: true,
       maxLength: 500,
       trim: true,
     },
@@ -20,7 +19,7 @@ const productoSchema = new Schema(
       min: 0,
     },
     imagen: {
-      type: String, // Aquí se puede almacenar la URL de la imagen o el path si usas un sistema de almacenamiento
+      type: String, // cloudinary
       required: true,
     },
     stock: {
@@ -32,15 +31,15 @@ const productoSchema = new Schema(
       type: Number,
       default: 0,
       min: 0,
-      max: 100, // El descuento es un porcentaje
+      max: 100,
     },
     id_categoria: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "categorias",  // Referencia a la colección de categorías
+      ref: "Categorias",  // Referencia a la colección de categorías
       required: true,  // Cada producto debe pertenecer a una categoría
     },
   },
   { timestamps: true }
 );
 
-export default model("productos", productoSchema);
+export default model("Productos", productoSchema);

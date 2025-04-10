@@ -4,23 +4,19 @@ const ventaSchema = new mongoose.Schema(
     {
         cliente_id: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'Cliente', 
+            ref: 'Clientes', 
             required: true,
         },
         productos: [{
             producto_id: {
                 type: mongoose.Schema.Types.ObjectId,
-                ref: 'Producto', 
+                ref: 'Productos', 
                 required: true,
             },
             cantidad: {
                 type: Number,
                 required: true,
                 min: 1,
-            },
-            precio_unitario: {
-                type: Number,
-                required: true,
             },
             subtotal: {
                 type: Number,
@@ -44,6 +40,6 @@ const ventaSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-const Venta = mongoose.model('Venta', ventaSchema);
+const Venta = mongoose.model('Ventas', ventaSchema);
 
 export default Venta;

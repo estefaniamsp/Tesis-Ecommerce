@@ -1,10 +1,10 @@
-import Carrito from "../models/carritos.js";
+import Carritos from "../models/carritos.js";
 import mongoose from "mongoose";
 
 // Obtener todos los carritos
 const getAllCarritosController = async (req, res) => {
     try {
-        const carritos = await Carrito.find().populate('cliente').populate('productos.producto');
+        const carritos = await Carritos.find().populate('cliente').populate('productos.producto');
         res.status(200).json(carritos);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -15,7 +15,7 @@ const getAllCarritosController = async (req, res) => {
 const getCarritoByIDController = async (req, res) => {
     const { id } = req.params;
     try {
-        const carrito = await Carrito.findById(id).populate('cliente').populate('productos.producto');
+        const carrito = await Carritos.findById(id).populate('cliente').populate('productos.producto');
         const status = carrito ? 200 : 404;
         res.status(status).json(carrito || { msg: "Carrito no encontrado" });
     } catch (error) {
@@ -25,16 +25,16 @@ const getCarritoByIDController = async (req, res) => {
 
 // Crear un carrito
 const createCarritoController = async (req, res) => {
-    const { cliente, productos } = req.body;
+    const { clienteId, productos } = req.body;
 
     // Verificar si hay campos vacíos
-    if (!cliente || productos.length === 0) {
+    if (!clienteId || productos.length === 0) {
         return res.status(400).json({ msg: "Lo sentimos, debes llenar todos los campos" });
     }
 
     try {
         // Crear y guardar el nuevo carrito
-        const nuevoCarrito = new Carrito(req.body);
+        const nuevoCarrito = new Carritos(req.body);
         await nuevoCarrito.save();
 
         res.status(201).json({ msg: "Carrito creado exitosamente", carrito: nuevoCarrito });
@@ -60,7 +60,7 @@ const updateCarritoController = async (req, res) => {
 
     try {
         // Actualizar el carrito
-        const carritoActualizado = await Carrito.findByIdAndUpdate(id, req.body, { new: true });
+        const carritoActualizado = await Carritos.findByIdAndUpdate(id, req.body, { new: true });
 
         if (!carritoActualizado) {
             return res.status(404).json({ msg: "Carrito no encontrado" });
@@ -83,7 +83,7 @@ const deleteCarritoController = async (req, res) => {
 
     try {
         // Buscar y eliminar el carrito
-        const carritoEliminado = await Carrito.findByIdAndDelete(id);
+        const carritoEliminado = await Carritos.findByIdAndDelete(id);
 
         if (!carritoEliminado) {
             return res.status(404).json({ msg: "Carrito no encontrado" });

@@ -6,16 +6,16 @@ import {
     updateVentaController, 
     deleteVentaController 
 } from '../controllers/venta_controller.js'; 
-import verificarAutenticacion from '../middlewares/auth.js'; 
+import verificarAuthAdmin from '../middlewares/admin_auth.js'; 
 import { validarVenta, manejarErrores } from '../middlewares/validacionForms.js';
 
 const router = Router();
 
 // Obtener todas las ventas
-router.get('/ventas', verificarAutenticacion, getAllVentasController);
-router.get('/ventas/:id', verificarAutenticacion, getVentaByIDController);
-router.post('/ventas', verificarAutenticacion, validarVenta, manejarErrores, createVentaController);
-router.put('/ventas/:id', verificarAutenticacion, updateVentaController);
-router.delete('/ventas/:id', verificarAutenticacion, deleteVentaController);
+router.get('/ventas', verificarAuthAdmin, getAllVentasController);
+router.get('/ventas/:id', verificarAuthAdmin, getVentaByIDController);
+router.post('/ventas', verificarAuthAdmin, validarVenta, manejarErrores, createVentaController);
+router.put('/ventas/:id', verificarAuthAdmin, updateVentaController);
+router.delete('/ventas/:id', verificarAuthAdmin, deleteVentaController);
 
 export default router;

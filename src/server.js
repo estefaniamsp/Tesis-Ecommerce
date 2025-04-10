@@ -5,11 +5,11 @@ import dotenv from 'dotenv';
 import bodyParser from 'body-parser';
 
 import routerAdmin from './routers/admin_routes.js'
-import routerUsuario from './routers/usuario_routes.js'
 import routerCliente from './routers/cliente_routes.js'
 import routerProducto from './routers/producto_routes.js'
 import routerCategoria from './routers/categoria_routes.js'
 import routerVenta from './routers/venta_routes.js'
+import { createAdmin } from './controllers/admin_controller.js';
 
 const app = express()
 // Configuración específica para desarrollo utilizando dotenv
@@ -26,8 +26,8 @@ app.use(cors())
 
 app.use(express.json())
 
+createAdmin(); // Crear el admin por defecto al iniciar el servidor
 app.use('/api',routerAdmin);
-app.use('/api',routerUsuario)
 app.use('/api',routerCliente)
 app.use('/api',routerProducto)
 app.use('/api',routerCategoria)

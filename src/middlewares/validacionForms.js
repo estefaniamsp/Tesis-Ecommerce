@@ -1,6 +1,10 @@
 import { check, validationResult } from "express-validator";
 
-export const validarUsuario = [
+export const validarCliente = [
+    check("cedula")
+        .isLength({ min: 10, max: 20 })
+        .withMessage("La cédula debe tener entre 10 y 20 caracteres."),
+
     check("nombre")
         .isLength({ min: 3, max: 30 })
         .withMessage("El nombre debe tener entre 3 y 30 caracteres.")
@@ -17,46 +21,13 @@ export const validarUsuario = [
         .notEmpty()
         .withMessage('El campo "apellido" es obligatorio'),
 
-    check("email")
-        .isEmail()
-        .withMessage('El campo "email" no es correcto.')
+    check("genero")
+        .isLength({ min: 4, max: 10 })
+        .withMessage("El género debe tener entre 4 y 10 caracteres.")
+        .isAlpha("es-ES", { ignore: "áéíóúÁÉÍÓÚñÑ " })
+        .withMessage("El género solo debe contener letras.")
         .notEmpty()
-        .withMessage('El campo "email" es obligatorio'),
-
-    check("password")
-        .isLength({ min: 8, max: 20 })
-        .withMessage("La contraseña debe tener entre 8 y 20 caracteres.")
-        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*).*$/)
-        .withMessage("Debe contener al menos una mayúscula, una minúscula y un número.")
-        .notEmpty()
-        .withMessage('El campo "password" es obligatorio'),
-];
-
-// Validaciones para Clientes
-export const validarCliente = [
-    check("cedula")
-        .isLength({ min: 10, max: 20 })
-        .withMessage("La cédula debe tener entre 10 y 20 caracteres.")
-        .notEmpty()
-        .withMessage('El campo "cedula" es obligatorio'),
-
-    check("nombre")
-        .isLength({ min: 3, max: 20 })
-        .withMessage("El nombre debe tener entre 3 y 20 caracteres.")
-        .notEmpty()
-        .withMessage('El campo "nombre" es obligatorio'),
-
-    check("apellido")
-        .isLength({ min: 3, max: 20 })
-        .withMessage("El apellido debe tener entre 3 y 20 caracteres.")
-        .notEmpty()
-        .withMessage('El campo "apellido" es obligatorio'),
-
-    check("ciudad")
-        .isLength({ min: 3, max: 10 })
-        .withMessage("La ciudad debe tener entre 3 y 10 caracteres.")
-        .notEmpty()
-        .withMessage('El campo "ciudad" es obligatorio'),
+        .withMessage('El campo "genero" es obligatorio'),
 
     check("email")
         .isEmail()
@@ -66,23 +37,25 @@ export const validarCliente = [
 
     check("direccion")
         .isLength({ min: 5, max: 30 })
-        .withMessage("La dirección debe tener entre 5 y 30 caracteres.")
-        .notEmpty()
-        .withMessage('El campo "direccion" es obligatorio'),
+        .withMessage("La dirección debe tener entre 5 y 30 caracteres."),
 
     check("telefono")
         .isLength({ min: 10, max: 10 })
         .withMessage("El teléfono debe tener exactamente 10 caracteres.")
         .isNumeric()
-        .withMessage("El teléfono solo debe contener números.")
-        .notEmpty()
-        .withMessage('El campo "telefono" es obligatorio'),
+        .withMessage("El teléfono solo debe contener números."),
 
     check("fecha_nacimiento")
         .matches(/^\d{4}-\d{2}-\d{2}$/)
-        .withMessage("El formato debe ser YYYY-MM-DD.")
+        .withMessage("El formato debe ser YYYY-MM-DD."),
+
+    check("password")
+        .isLength({ min: 8, max: 20 })
+        .withMessage("La contraseña debe tener entre 8 y 20 caracteres.")
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*).*$/)
+        .withMessage("Debe contener al menos una mayúscula, una minúscula y un número.")
         .notEmpty()
-        .withMessage('El campo "fecha_nacimiento" es obligatorio'),
+        .withMessage('El campo "password" es obligatorio'),
 ];
 
 export const validarProducto = [
@@ -216,11 +189,11 @@ export const validarFactura = [
 ];
 
 export const validarCarrito = [
-    check("usuario_id")
+    check("cliente_id")
         .isInt()
-        .withMessage("El ID del usuario debe ser un número entero.")
+        .withMessage("El ID del cliente debe ser un número entero.")
         .notEmpty()
-        .withMessage('El campo "usuario_id" es obligatorio'),
+        .withMessage('El campo "cliente_id" es obligatorio'),
 
     check("productos")
         .isArray({ min: 1 })
