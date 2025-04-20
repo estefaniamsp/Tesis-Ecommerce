@@ -7,14 +7,18 @@ const verificarAutenticacion = async (req, res, next) => {
   // Validación si se está enviando el token
   if (!req.headers.authorization) return res.status(404).json({ msg: "Lo sentimos, debes proprocionar un token" });
   try {
-    const { id } = jwt.verify(req.headers.authorization, process.env.JWT_SECRET);
+    const token = req.headers.authorization.split(" ")[1];
+    const { id } = jwt.verify(token, process.env.JWT_SECRET);
+
     req.clienteBDD = await Clientes.findById(id).select("-password");
-    if (req.clienteBDD) next();
+
+    if (req.clienteBDD)return next();
     req.adminBDD = await Admin.findById(id).select("-password");
-    if (req.adminBDD) next();
+    if (req.adminBDD)return next();
     return res.status(404).json({ msg: "Lo sentimos, no tienes permisos para acceder a esta ruta" });
     
   } catch (error) {
+
     const e = new Error("Formato del token no válido")
     return res.status(404).json({ msg: e.message }) 
   }

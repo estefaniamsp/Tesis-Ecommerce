@@ -1,10 +1,11 @@
 import Producto from "../models/productos.js";
 import mongoose from "mongoose";
+import cloudinary from "../config/cloudinary.js";
 
 // Obtener todos los productos
 const getAllProductosController = async (req, res) => {
   try {
-    const productos = await Producto.find().populate('categoria');
+    const productos = await Producto.find().populate('id_categoria');
 
     if (productos.length === 0) {
       return res.status(404).json({ msg: "No se encontraron productos" });
@@ -27,7 +28,7 @@ const getProductoByIDController = async (req, res) => {
   }
 
   try {
-    const producto = await Producto.findById(id).populate('categoria');
+    const producto = await Producto.findById(id).populate('id_categoria');
 
     if (!producto) {
       return res.status(404).json({ msg: "Producto no encontrado" });
@@ -42,40 +43,53 @@ const getProductoByIDController = async (req, res) => {
 
 // Crear un nuevo producto
 const createProductoController = async (req, res) => {
-  const { nombre, descripcion, precio, cantidad, categoria, imagen } = req.body;
+  const { nombre, descripcion, precio, id_categoria, stock } = req.body;
+  let beneficios = req.body.beneficios;
 
-  // Verificar que todos los campos necesarios estén presentes
-  if (!nombre || !descripcion || !precio || !cantidad || !categoria || !imagen) {
+  // Validaciones básicas
+  if (!nombre || !descripcion || !beneficios || !precio || !stock || !id_categoria) {
+    console.log(req.body);
     return res.status(400).json({ msg: "Todos los campos son necesarios" });
   }
 
-  // Verificar si el precio y la cantidad son válidos
   if (isNaN(precio) || precio <= 0) {
     return res.status(400).json({ msg: "El precio debe ser un número positivo" });
   }
 
-  if (isNaN(cantidad) || cantidad <= 0) {
-    return res.status(400).json({ msg: "La cantidad debe ser un número positivo" });
+  if (!beneficios) {
+    beneficios = [];
+  } else if (typeof beneficios === "string") {
+    beneficios = [beneficios];
+  }
+
+  // Verifica si llegó un archivo (imagen)
+  if (!req.file) {
+    return res.status(400).json({ msg: "La imagen del producto es obligatoria" });
   }
 
   try {
-    // Verificar si el producto ya existe (basado en el nombre o algún otro criterio único)
+    // Verifica si ya existe un producto con ese nombre
     const productoExistente = await Producto.findOne({ nombre });
     if (productoExistente) {
       return res.status(400).json({ msg: "El producto con ese nombre ya existe" });
     }
 
-    // Crear el nuevo producto
+    // Obtiene la URL segura de la imagen subida a Cloudinary
+    const imagen = req.file.path;
+    const imagen_id = req.file.filename;
+
+    // Crea el nuevo producto
     const nuevoProducto = new Producto({
       nombre,
       descripcion,
+      beneficios,
       precio,
-      cantidad,
-      categoria,
+      stock, 
+      id_categoria: id_categoria, 
       imagen,
+      imagen_id,
     });
 
-    // Guardar el producto en la base de datos
     await nuevoProducto.save();
 
     return res.status(201).json({ msg: "Producto creado exitosamente", producto: nuevoProducto });
@@ -95,38 +109,48 @@ const updateProductoController = async (req, res) => {
     return res.status(400).json({ msg: "ID de producto no válido" });
   }
 
-  // Verificar si el producto existe
-  const producto = await Producto.findById(id);
-  if (!producto) {
-    return res.status(404).json({ msg: "Producto no encontrado" });
-  }
-
-  // Verificar si los campos de precio y cantidad son válidos
-  if (precio && (isNaN(precio) || precio <= 0)) {
-    return res.status(400).json({ msg: "El precio debe ser un número positivo" });
-  }
-
-  if (cantidad && (isNaN(cantidad) || cantidad <= 0)) {
-    return res.status(400).json({ msg: "La cantidad debe ser un número positivo" });
-  }
-
   try {
-    // Actualizar los valores del producto
+    const producto = await Producto.findById(id);
+    if (!producto) {
+      return res.status(404).json({ msg: "Producto no encontrado" });
+    }
+
+    // Validaciones numéricas
+    if (precio && (isNaN(precio) || precio <= 0)) {
+      return res.status(400).json({ msg: "El precio debe ser un número positivo" });
+    }
+
+    if (cantidad && (isNaN(cantidad) || cantidad <= 0)) {
+      return res.status(400).json({ msg: "La cantidad debe ser un número positivo" });
+    }
+
+    // Actualizar imagen si llegó una nueva
+    if (req.file) {
+      // 1. Eliminar la imagen anterior de Cloudinary si existe
+      if (producto.imagen_id) {
+        await cloudinary.uploader.destroy(producto.imagen_id);
+      }
+
+      // 2. Asignar nueva imagen
+      producto.imagen = req.file.path;
+      producto.imagen_id = req.file.filename;
+    }
+
+    // Actualizar resto de campos
     producto.nombre = nombre || producto.nombre;
     producto.descripcion = descripcion || producto.descripcion;
     producto.precio = precio || producto.precio;
-    producto.cantidad = cantidad || producto.cantidad;
-    producto.categoria = categoria || producto.categoria;
-    producto.imagen = imagen || producto.imagen;
+    producto.stock = cantidad || producto.stock;
+    producto.id_categoria = categoria || producto.id_categoria;
 
-    // Guardar los cambios en la base de datos
     await producto.save();
 
     return res.status(200).json({ msg: "Producto actualizado exitosamente", producto });
+
   } catch (error) {
     console.error(error);
     return res.status(500).json({ msg: "Error al actualizar el producto", error });
-  }
+  } 
 };
 
 // Eliminar un producto
@@ -139,13 +163,20 @@ const deleteProductoController = async (req, res) => {
   }
 
   try {
-    // Buscar y eliminar el producto
-    const productoEliminado = await Producto.findByIdAndDelete(id);
-    if (!productoEliminado) {
+    const producto = await Producto.findById(id);
+
+    if (!producto) {
       return res.status(404).json({ msg: "Producto no encontrado" });
     }
 
-    return res.status(200).json({ msg: `Producto eliminado con éxito`, producto: productoEliminado });
+    // Eliminar imagen en Cloudinary si existe
+    if (producto.imagen_id) {
+      await cloudinary.uploader.destroy(producto.imagen_id);
+    }
+
+    await producto.deleteOne();
+
+    return res.status(200).json({ msg: `Producto eliminado con éxito`, producto });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ msg: "Error al eliminar el producto", error });

@@ -29,55 +29,78 @@ const getVentaByIDController = async (req, res) => {
 };
 
 // Crear una nueva venta
-const createVentaController = async (req, res) => {
-  const { clienteId, productos } = req.body;
+const createVentaCliente = async (req, res) => {
+  const { productos } = req.body;
+  const clienteId = req.clienteBDD._id.toString();
 
-  // Verificar si hay campos vacíos
-  if (Object.values(req.body).includes("")) {
-    return res.status(400).json({ msg: "Lo sentimos, debes llenar todos los campos" });
+  if (!productos || productos.length === 0) {
+    return res.status(400).json({ msg: "Debes agregar al menos un producto" });
   }
 
   try {
-    // Verificar si el cliente existe
     const clienteExistente = await Clientes.findById(clienteId);
     if (!clienteExistente) {
       return res.status(404).json({ msg: "Cliente no encontrado" });
     }
 
-    // Calcular el total de la venta
     let totalVenta = 0;
     const productosConDetalles = [];
 
     for (let i = 0; i < productos.length; i++) {
-      const producto = await Productos.findById(productos[i].producto);
+      const item = productos[i];
+      const { producto_id, cantidad } = item;
 
-      if (!producto) {
-        return res.status(404).json({ msg: `Producto con ID ${productos[i].producto} no encontrado.` });
+      if (!producto_id || !cantidad) {
+        return res.status(400).json({ msg: `Falta producto o cantidad en el índice ${i}` });
       }
 
-      const subtotal = producto.precio * productos[i].cantidad;
+      const producto = await Productos.findById(producto_id);
+      if (!producto) {
+        return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
+      }
+
+      // Verificar stock suficiente
+      if (producto.stock < cantidad) {
+        return res.status(400).json({ msg: `Stock insuficiente para ${producto.nombre}. Stock disponible: ${producto.stock}` });
+      }
+
+      // Restar stock
+      producto.stock -= cantidad;
+      await producto.save();
+
+      const subtotal = producto.precio * cantidad;
       totalVenta += subtotal;
 
       productosConDetalles.push({
-        producto: producto._id,
-        cantidad: productos[i].cantidad,
-        precio_unitario: producto.precio,
+        producto_id: producto._id,
+        cantidad: cantidad,
         subtotal: subtotal,
       });
     }
 
-    // Crear y guardar la nueva venta
     const nuevaVenta = new Ventas({
-      cliente: clienteExistente._id,
+      cliente_id: clienteExistente._id,
       productos: productosConDetalles,
       total: totalVenta,
       estado: "pendiente",
     });
 
     await nuevaVenta.save();
-    res.status(201).json({ msg: "Venta creada exitosamente", venta: nuevaVenta });
+
+    // 🔥 Filtrar los _id de productos antes de enviar la respuesta
+    const ventaSinIdsInternos = {
+      ...nuevaVenta._doc,
+      productos: nuevaVenta.productos.map(p => {
+        const { _id, ...resto } = p._doc;
+        return resto;
+      })
+    };
+
+    res.status(201).json({ msg: "Venta creada exitosamente", venta: ventaSinIdsInternos });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error al crear venta:", error);
+    res.status(500).json({ msg: "Error interno del servidor" });
   }
 };
 
@@ -136,7 +159,7 @@ const deleteVentaController = async (req, res) => {
 export {
   getAllVentasController,
   getVentaByIDController,
-  createVentaController,
+  createVentaCliente,
   updateVentaController,
   deleteVentaController,
 };

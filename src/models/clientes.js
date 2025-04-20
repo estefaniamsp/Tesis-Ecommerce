@@ -43,7 +43,7 @@ const clienteSchema = new Schema(
       trim: true,
       maxLenght: 30,
     },
-    fechaNacimiento: {
+    fecha_nacimiento: {
       type: Date,
     },
     telefono: {

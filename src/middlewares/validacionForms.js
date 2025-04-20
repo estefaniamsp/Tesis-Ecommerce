@@ -1,9 +1,6 @@
-import { check, validationResult } from "express-validator";
+import { check, body, validationResult } from "express-validator";
 
 export const validarCliente = [
-    check("cedula")
-        .isLength({ min: 10, max: 20 })
-        .withMessage("La cédula debe tener entre 10 y 20 caracteres."),
 
     check("nombre")
         .isLength({ min: 3, max: 30 })
@@ -35,20 +32,6 @@ export const validarCliente = [
         .notEmpty()
         .withMessage('El campo "email" es obligatorio'),
 
-    check("direccion")
-        .isLength({ min: 5, max: 30 })
-        .withMessage("La dirección debe tener entre 5 y 30 caracteres."),
-
-    check("telefono")
-        .isLength({ min: 10, max: 10 })
-        .withMessage("El teléfono debe tener exactamente 10 caracteres.")
-        .isNumeric()
-        .withMessage("El teléfono solo debe contener números."),
-
-    check("fecha_nacimiento")
-        .matches(/^\d{4}-\d{2}-\d{2}$/)
-        .withMessage("El formato debe ser YYYY-MM-DD."),
-
     check("password")
         .isLength({ min: 8, max: 20 })
         .withMessage("La contraseña debe tener entre 8 y 20 caracteres.")
@@ -58,6 +41,59 @@ export const validarCliente = [
         .withMessage('El campo "password" es obligatorio'),
 ];
 
+export const validarClientePerfil = [
+    check("cedula")
+        .isLength({ min: 10, max: 20 })
+        .withMessage("La cédula debe tener entre 10 y 20 caracteres.")
+        .notEmpty()
+        .withMessage('El campo "cedula" es obligatorio'),
+
+    check("nombre")
+        .isLength({ min: 3, max: 30 })
+        .withMessage("El nombre debe tener entre 3 y 30 caracteres.")
+        .isAlpha("es-ES", { ignore: "áéíóúÁÉÍÓÚñÑ " })
+        .withMessage("El nombre solo debe contener letras.")
+        .notEmpty()
+        .withMessage('El campo "nombre" es obligatorio'),
+
+    check("apellido")
+        .isLength({ min: 3, max: 20 })
+        .withMessage("El apellido debe tener entre 3 y 20 caracteres.")
+        .isAlpha("es-ES", { ignore: "áéíóúÁÉÍÓÚñÑ " })
+        .withMessage("El apellido solo debe contener letras.")
+        .notEmpty()
+        .withMessage('El campo "apellido" es obligatorio'),
+
+    check("genero")
+        .isLength({ min: 4, max: 10 })
+        .withMessage("El género debe tener entre 4 y 10 caracteres.")
+        .isAlpha("es-ES", { ignore: "áéíóúÁÉÍÓÚñÑ " })
+        .withMessage("El género solo debe contener letras.")
+        .notEmpty()
+        .withMessage('El campo "genero" es obligatorio'),
+
+    check("direccion")
+        .isLength({ min: 5, max: 30 })
+        .withMessage("La dirección debe tener entre 5 y 30 caracteres.")
+        .notEmpty()
+        .withMessage('El campo "direccion" es obligatorio'),
+
+    check("telefono")
+        .isLength({ min: 10, max: 10 })
+        .withMessage("El teléfono debe tener exactamente 10 caracteres.")
+        .isNumeric()
+        .withMessage("El teléfono solo debe contener números.")
+        .notEmpty()
+        .withMessage('El campo "telefono" es obligatorio'),
+
+    check("fecha_nacimiento")
+        .matches(/^\d{4}-\d{2}-\d{2}$/)
+        .withMessage("El formato debe ser YYYY-MM-DD.")
+        .notEmpty()
+        .withMessage('El campo "fecha_nacimiento" es obligatorio'),
+];
+
+
 export const validarProducto = [
     check("nombre")
         .isLength({ min: 3, max: 100 })
@@ -66,8 +102,8 @@ export const validarProducto = [
         .withMessage('El campo "nombre" es obligatorio'),
 
     check("descripcion")
-        .isLength({ min: 5, max: 200 })
-        .withMessage("La descripción debe tener entre 5 y 200 caracteres.")
+        .isLength({ min: 5, max: 500 })
+        .withMessage("La descripción debe tener entre 5 y 500 caracteres.")
         .notEmpty()
         .withMessage('El campo "descripcion" es obligatorio'),
 
@@ -77,22 +113,39 @@ export const validarProducto = [
         .notEmpty()
         .withMessage('El campo "precio" es obligatorio'),
 
-    check("categoria")
-        .isLength({ min: 3, max: 30 })
-        .withMessage("La categoría debe tener entre 3 y 30 caracteres.")
-        .notEmpty()
-        .withMessage('El campo "categoria" es obligatorio'),
+    check("stock")
+        .notEmpty().withMessage('El campo "stock" es obligatorio')
+        .isInt({ min: 0 })
+        .withMessage("El stock debe ser un número entero igual o mayor a 0."),
 
-    check("cantidad")
-        .isInt({ min: 1 })
-        .withMessage("La cantidad debe ser un número entero mayor o igual a 1.")
-        .notEmpty()
-        .withMessage('El campo "cantidad" es obligatorio'),
-
-    check("imagen_url")
+    check("descuento")
         .optional()
-        .isURL()
-        .withMessage('El campo "imagen_url" debe ser una URL válida'),
+        .isInt({ min: 0, max: 100 })
+        .withMessage("El descuento debe ser un número entre 0 y 100."),
+
+    check("id_categoria")
+        .notEmpty().withMessage('El campo "id_categoria" es obligatorio')
+        .isMongoId()
+        .withMessage("El id de la categoría debe ser un ObjectId válido."),
+
+    // Validación personalizada para beneficios (opcional, máximo 3 strings no vacíos)
+    body("beneficios")
+        .optional()
+        .isArray({ max: 3 }).withMessage("Solo se permiten hasta 3 beneficios.")
+        .custom((array) => {
+            if (!array.every((item) => typeof item === "string" && item.trim() !== "")) {
+                throw new Error("Todos los beneficios deben ser textos no vacíos.");
+            }
+            return true;
+        }),
+
+    body("imagen")
+        .custom((value, { req }) => {
+            if (!req.file) {
+                throw new Error("La imagen es obligatoria");
+            }
+            return true;
+        }),
 ];
 
 export const validarCategoria = [
@@ -107,25 +160,16 @@ export const validarCategoria = [
         .isLength({ min: 5, max: 200 })
         .withMessage("La descripción de la categoría debe tener entre 5 y 200 caracteres."),
 
-    check("imagen_url")
-        .optional()
-        .isURL()
-        .withMessage('El campo "imagen_url" debe ser una URL válida'),
+    body("imagen")
+        .custom((value, { req }) => {
+            if (!req.file) {
+                throw new Error("La imagen es obligatoria");
+            }
+            return true;
+        }),
 ];
 
 export const validarVenta = [
-    check("cliente_id")
-        .isInt()
-        .withMessage("El ID del cliente debe ser un número entero.")
-        .notEmpty()
-        .withMessage('El campo "cliente_id" es obligatorio'),
-
-    check("fecha_venta")
-        .matches(/^\d{4}-\d{2}-\d{2}$/)
-        .withMessage("El formato de fecha debe ser YYYY-MM-DD.")
-        .notEmpty()
-        .withMessage('El campo "fecha_venta" es obligatorio'),
-
     check("productos")
         .isArray({ min: 1 })
         .withMessage("Debe haber al menos un producto en la venta.")
@@ -133,7 +177,7 @@ export const validarVenta = [
         .withMessage('El campo "productos" es obligatorio'),
 
     check("productos.*.producto_id")
-        .isInt()
+        .isMongoId()
         .withMessage("Cada producto debe tener un ID válido.")
         .notEmpty()
         .withMessage('El campo "producto_id" es obligatorio para cada producto'),
@@ -143,18 +187,6 @@ export const validarVenta = [
         .withMessage("La cantidad de cada producto debe ser un número entero mayor o igual a 1.")
         .notEmpty()
         .withMessage('El campo "cantidad" es obligatorio para cada producto'),
-
-    check("total")
-        .isDecimal()
-        .withMessage("El total debe ser un número decimal.")
-        .notEmpty()
-        .withMessage('El campo "total" es obligatorio'),
-
-    check("estado")
-        .isIn(["pendiente", "completada", "cancelada"])
-        .withMessage("El estado debe ser uno de los siguientes: 'pendiente', 'completada', 'cancelada'.")
-        .notEmpty()
-        .withMessage('El campo "estado" es obligatorio'),
 ];
 
 export const validarFactura = [
@@ -249,7 +281,7 @@ export const validarAdmin = [
         .withMessage("Debe contener al menos una mayúscula, una minúscula y un número.")
         .notEmpty()
         .withMessage('El campo "password" es obligatorio'),
-    
+
     check("nuevaPassword")
         .isLength({ min: 8, max: 20 })
         .withMessage("La nueva contraseña debe tener entre 8 y 20 caracteres.")

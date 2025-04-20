@@ -18,7 +18,7 @@ const sendMailToUser = (userMail, token) => {
         from: process.env.USER_MAILTRAP,
         to: userMail,
         subject: "Verifica tu cuenta",
-        html: `<p>Hola, haz clic <a href="${process.env.URL_BACKEND}confirmar/${encodeURIComponent(token)}">aquí</a> para confirmar tu cuenta.</p>`
+        html: `<p>Hola, haz clic <a href="${process.env.URL_BACKEND}confirmarCliente/${encodeURIComponent(token)}">aquí</a> para confirmar tu cuenta.</p>`
     };
     
 
@@ -31,4 +31,26 @@ const sendMailToUser = (userMail, token) => {
     });
 };
 
-export default sendMailToUser
+const sendMailToUserAdmin = (userMail, token) => {
+
+    let mailOptions = {
+        from: process.env.USER_MAILTRAP,
+        to: userMail,
+        subject: "Verifica tu cuenta",
+        html: `<p>Hola, haz clic <a href="${process.env.URL_BACKEND}confirmarAdmin/${encodeURIComponent(token)}">aquí</a> para confirmar tu cuenta.</p>`
+    };
+    
+
+    transporter.sendMail(mailOptions, function(error, info){
+        if (error) {
+            console.log(error);
+        } else {
+            console.log('Correo enviado: ' + info.response);
+        }
+    });
+};
+
+export {
+    sendMailToUser,
+    sendMailToUserAdmin
+}

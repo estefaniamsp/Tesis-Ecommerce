@@ -3,49 +3,57 @@ import generarJWT from "../T_helpers/crearJWT.js";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 import mongoose from "mongoose";
-import sendMailToUser from "../config/nodemailer.js";
+import { sendMailToUser } from "../config/nodemailer.js";
+import e from "express";
 
 // Registrar cliente
 const registerCliente = async (req, res) => {
     const { nombre, apellido, genero, email, password } = req.body;
 
-    // Verificar que no haya campos vacíos
+    // Validación básica
     if (!nombre || !apellido || !genero || !email || !password) {
         return res.status(400).json({ msg: "Todos los campos son obligatorios" });
     }
 
-    // Verificar si el email ya está registrado
     const verificarEmailBDD = await Clientes.findOne({ email });
-
     if (verificarEmailBDD) {
         return res.status(400).json({ msg: "El email ya se encuentra registrado" });
     }
 
     try {
-        // Crear nuevo cliente con todos los campos
+        // Crear cliente y encriptar contraseña
         const nuevoCliente = new Clientes({ nombre, apellido, genero, email, password });
-
-        // Encriptar la contraseña
         nuevoCliente.password = await nuevoCliente.encryptPassword(password);
-        const token = nuevoCliente.crearToken()
-        await sendMailToUser(email,token)
-        await nuevoCliente.save();
-        res.status(200).json({msg:"Revisa tu correo electrónico para confirmar tu cuenta"})
+        const token = nuevoCliente.crearToken();
 
-        // Excluir la contraseña antes de enviar la respuesta
+        // ENVIAR CORREO ANTES DE GUARDAR
+        try {
+            await sendMailToUser(email, token);
+        } catch (mailError) {
+            console.error("Error al enviar el correo:", mailError.message);
+            return res.status(500).json({ msg: "No se pudo enviar el correo de confirmación" });
+        }
+
+        // Guardar en base de datos solo si el correo fue enviado con éxito
+        await nuevoCliente.save();
+
         const { password: _, ...clienteSinPassword } = nuevoCliente.toObject();
 
-        res.status(200).json({ msg: "Registro exitoso, ya puedes hacer login", cliente: clienteSinPassword });
+        return res.status(200).json({
+            msg: "Revisa tu correo electrónico para confirmar tu cuenta",
+            cliente: clienteSinPassword,
+        });
+
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ msg: "Error al registrar el cliente" });
+        console.error("Error al registrar el cliente:", error.message);
+        return res.status(500).json({ msg: "Error al registrar el cliente" });
     }
 };
 
 //  Verificar correo de confirmación
 const confirmEmail = async (req, res) => {
     const { token } = req.params;
-
+    console.log(token);
     if (!token) {
         return res.status(400).json({ msg: "Token no proporcionado" });
     }
@@ -54,7 +62,7 @@ const confirmEmail = async (req, res) => {
         const cliente = await Clientes.findOne({ token });
 
         if (!cliente) {
-            return res.status(404).json({ msg: "Token inválido o expirado" });
+            return res.status(404).json({ msg: "Token inválido o expirado " + token });
         }
 
         cliente.confirmEmail = true;
@@ -104,37 +112,61 @@ const loginCliente = async (req, res) => {
 
 // Modificar perfil de cliente
 const updateClienteProfile = async (req, res) => {
-    const id = req.clienteBDD._id; // ID autenticado
-    const { nombre, apellido, genero, email } = req.body;
-
-    if (Object.keys(req.body).length === 0) {
-        return res.status(400).json({ msg: "No hay datos para actualizar" });
-    }
+    let { _id } = req.clienteBDD;
+    _id = _id.toString(); // Convertir a string para evitar problemas de comparación
+    const {
+        cedula,
+        nombre,
+        apellido,
+        genero,
+        email,
+        direccion,
+        telefono,
+        fecha_nacimiento
+    } = req.body;
 
     try {
-        const cliente = await Clientes.findById(id);
+        const cliente = await Clientes.findById(_id);
         if (!cliente) {
-            return res.status(404).json({ msg: "Cliente no encontrado" });
+            res.status(404).json({ msg: "Cliente no encontrado" });
         }
 
         if (email && email !== cliente.email) {
             const emailExistente = await Clientes.findOne({ email });
-            if (emailExistente) {
-                return res.status(400).json({ msg: "El email ya está en uso" });
+            if (emailExistente && emailExistente._id.toString() !== _id.toString()) {
+                res.status(400).json({ msg: "El email ya está en uso por otro cliente" });
             }
         }
 
-        cliente.nombre = nombre ?? cliente.nombre;
-        cliente.apellido = apellido ?? cliente.apellido;
-        cliente.genero = genero ?? cliente.genero;
-        cliente.email = email ?? cliente.email;
+        // Actualización segura campo por campo
+        if (cedula) cliente.cedula = cedula;
+        if (nombre) cliente.nombre = nombre;
+        if (apellido) cliente.apellido = apellido;
+        if (genero) cliente.genero = genero;
+        if (email) cliente.email = email;
+        if (direccion) cliente.direccion = direccion;
+        if (telefono) cliente.telefono = telefono;
+        if (fecha_nacimiento) cliente.fecha_nacimiento = fecha_nacimiento;
 
         await cliente.save();
+        res.status(200).json({
+            msg: "Perfil actualizado con éxito", cliente: {
+                cedula: cliente.cedula,
+                nombre: cliente.nombre,
+                apellido: cliente.apellido,
+                genero: cliente.genero,
+                email: cliente.email,
+                direccion: cliente.direccion,
+                telefono: cliente.telefono,
+                fecha_nacimiento: cliente.fecha_nacimiento
+            }
+        })
 
-        res.status(200).json({ msg: "Perfil actualizado con éxito", cliente: cliente });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ msg: "Error al actualizar el perfil" });
+        console.error("Error al actualizar el perfil:", error);
+        if (!res.headersSent) {
+            res.status(500).json({ msg: "Error del servidor al actualizar el perfil" });
+        }
     }
 };
 
@@ -145,6 +177,7 @@ const recuperarContrasenia = async (req, res) => {
 
     try {
         const cliente = await Clientes.findOne({ email });
+        console.log("Cliente encontrado:", cliente);
 
         if (!cliente) {
             return res.status(404).json({ msg: "Correo no registrado" });
@@ -157,13 +190,13 @@ const recuperarContrasenia = async (req, res) => {
         const transporter = nodemailer.createTransport({
             service: "gmail",
             auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS,
+                user: process.env.USER_MAILTRAP,
+                pass: process.env.PASS_MAILTRAP,
             },
         });
 
         await transporter.sendMail({
-            from: process.env.EMAIL_USER,
+            from: process.env.USER_MAILTRAP,
             to: email,
             subject: "Código de recuperación de contraseña",
             text: `Tu código de recuperación es: ${codigoRecuperacion}`,
@@ -171,6 +204,7 @@ const recuperarContrasenia = async (req, res) => {
 
         res.json({ msg: "Código de recuperación enviado al correo" });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ msg: "Error al enviar el código de recuperación" });
     }
 };
@@ -187,7 +221,7 @@ const cambiarContrasenia = async (req, res) => {
         }
 
         cliente.password = await bcrypt.hash(nuevaPassword, 10);
-        cliente.codigoRecuperacion = null; 
+        cliente.codigoRecuperacion = null;
         await cliente.save();
 
         res.json({ msg: "Contraseña cambiada con éxito" });

@@ -17,6 +17,10 @@ const categoriaSchema = new mongoose.Schema(
       type: String,
       required: false, 
     },
+    imagen_id: {
+      type: String,
+      required: false, 
+    },
     
   },
   {

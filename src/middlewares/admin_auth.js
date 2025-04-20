@@ -4,19 +4,30 @@ import Admin from "../models/administrador.js";
 // Método para proteger rutas
 const verificarAuthAdmin = async (req, res, next) => {
   // Validación si se está enviando el token
-  if (!req.headers.authorization) return res.status(404).json({ msg: "Lo sentimos, debes proprocionar un token" });
+  if (!req.headers.authorization) return res.status(404).json({ msg: "Lo sentimos, debes proporcionar un token" });
+
   try {
-    const { id, rol } = jwt.verify(req.headers.authorization, process.env.JWT_SECRET);
-    if (rol !== "admin")
-      return res.status(404).json({ msg: "Lo sentimos, no tienes permisos para acceder a esta ruta" });
+    // Extraer el token (sin "Bearer")
+    const token = req.headers.authorization.split(" ")[1];
+
+    // Verificar y decodificar el token
+    const { id, rol } = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Validar que el rol sea "admin"
+    if (rol !== "admin") {
+      return res.status(403).json({ msg: "Lo sentimos, no tienes permisos para acceder a esta ruta" });
+    }
+
+    // Encontrar al administrador en la base de datos
     req.adminBDD = await Admin.findById(id).select("-password");
-    if (!req.adminBDD) return res.status(404).json({ msg: "Lo sentimos, no tienes permisos para acceder a esta ruta" });
-    next();
+    if (!req.adminBDD) return res.status(404).json({ msg: "Administrador no encontrado" });
+
+    // Si todo es correcto, continuar con la siguiente acción
+    return next();
   } catch (error) {
-    const e = new Error("Formato del token no válido")
-    return res.status(404).json({ msg: e.message }) 
+    return res.status(404).json({ msg: "Formato del token no válido o expirado" });
   }
-}
+};
 
 // Exportar el método
 export default verificarAuthAdmin;

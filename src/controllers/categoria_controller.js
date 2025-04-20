@@ -1,5 +1,7 @@
 import Categoria from "../models/categorias.js";
 import mongoose from "mongoose";
+import cloudinary from '../config/cloudinary.js';
+
 // Obtener todas las categorías
 const getAllCategoriasController = async (req, res) => {
   try {
@@ -42,7 +44,9 @@ const getCategoriaByIDController = async (req, res) => {
 
 // Crear una nueva categoría
 const createCategoriaController = async (req, res) => {
-  const { nombre, descripcion, imagen } = req.body;
+  const { nombre, descripcion } = req.body;
+  const imagen = req.file ? req.file.path : '';  // Aquí obtenemos la URL de la imagen subida a Cloudinary
+  const imagen_id = req.file ? req.file.filename : '';
 
   // Validar que todos los campos necesarios estén presentes
   if (!nombre || !descripcion) {
@@ -57,7 +61,7 @@ const createCategoriaController = async (req, res) => {
     }
 
     // Crear y guardar la nueva categoría
-    const nuevaCategoria = new Categoria({ nombre, descripcion, imagen });
+    const nuevaCategoria = new Categoria({ nombre, descripcion, imagen, imagen_id });
     await nuevaCategoria.save();
 
     return res.status(201).json({ msg: "Categoría creada exitosamente", categoria: nuevaCategoria });
@@ -70,7 +74,8 @@ const createCategoriaController = async (req, res) => {
 // Actualizar una categoría existente
 const updateCategoriaController = async (req, res) => {
   const { id } = req.params;
-  const { nombre, descripcion, imagen } = req.body;
+  const { nombre, descripcion } = req.body;
+  const imagen = req.file ? req.file.path : ''; // Obtener la URL de la nueva imagen
 
   // Verificar si la categoría existe
   const categoria = await Categoria.findById(id);
@@ -81,7 +86,7 @@ const updateCategoriaController = async (req, res) => {
   // Actualizar la categoría con los nuevos valores
   categoria.nombre = nombre || categoria.nombre;
   categoria.descripcion = descripcion || categoria.descripcion;
-  categoria.imagen = imagen || categoria.imagen;
+  categoria.imagen = imagen || categoria.imagen;  // Actualizar la imagen si se sube una nueva
 
   try {
     await categoria.save();
@@ -96,15 +101,23 @@ const updateCategoriaController = async (req, res) => {
 const deleteCategoriaController = async (req, res) => {
   const { id } = req.params;
 
-  // Verificar si la categoría existe
-  const categoria = await Categoria.findById(id);
-  if (!categoria) {
-    return res.status(404).json({ msg: "Categoría no encontrada" });
-  }
-
   try {
+    // 1. Verificar si la categoría existe
+    const categoria = await Categoria.findById(id);
+    if (!categoria) {
+      return res.status(404).json({ msg: "Categoría no encontrada" });
+    }
+
+    // 2. Eliminar la imagen de Cloudinary (si tiene imagen_id)
+    if (categoria.imagen_id) {
+      await cloudinary.uploader.destroy(categoria.imagen_id);
+    }
+
+    // 3. Eliminar la categoría de la base de datos
     await Categoria.findByIdAndDelete(id);
+
     return res.status(200).json({ msg: "Categoría eliminada exitosamente" });
+
   } catch (error) {
     console.error(error);
     return res.status(500).json({ msg: "Error al eliminar la categoría", error });
