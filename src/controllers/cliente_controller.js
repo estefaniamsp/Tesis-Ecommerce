@@ -230,11 +230,125 @@ const cambiarContrasenia = async (req, res) => {
     }
 };
 
+const getAllClientes = async (req, res) => {
+    try {
+      const clientes = await Clientes.find().select("-password -token -codigoRecuperacion");
+      res.status(200).json(clientes);
+    } catch (error) {
+      res.status(500).json({ msg: "Error al obtener los clientes", error: error.message });
+    }
+  };
+
+  const getClienteById = async (req, res) => {
+    const { id } = req.params;
+  
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ msg: "ID inválido" });
+    }
+  
+    try {
+      const cliente = await Clientes.findById(id).select("-password -token -codigoRecuperacion");
+  
+      if (!cliente) {
+        return res.status(404).json({ msg: "Cliente no encontrado" });
+      }
+  
+      res.status(200).json(cliente);
+    } catch (error) {
+      res.status(500).json({ msg: "Error al buscar el cliente", error: error.message });
+    }
+  };
+
+  const createClienteAdmin = async (req, res) => {
+    const { nombre, apellido, genero, email, password } = req.body;
+  
+    if (!nombre || !apellido || !genero || !email || !password) {
+      return res.status(400).json({ msg: "Todos los campos son obligatorios" });
+    }
+  
+    const existe = await Clientes.findOne({ email });
+    if (existe) {
+      return res.status(400).json({ msg: "Este email ya está registrado" });
+    }
+  
+    try {
+      const nuevoCliente = new Clientes({ nombre, apellido, genero, email, password, confirmEmail: true });
+      nuevoCliente.password = await nuevoCliente.encryptPassword(password);
+      const token = nuevoCliente.crearToken();
+
+      try {
+        await sendMailToUser(email, token);
+    } catch (mailError) {
+        console.error("Error al enviar el correo:", mailError.message);
+        return res.status(500).json({ msg: "No se pudo enviar el correo de confirmación" });
+    }
+
+    // Guardar en base de datos solo si el correo fue enviado con éxito
+      await nuevoCliente.save();
+  
+      const { password: _, ...clienteSinPassword } = nuevoCliente.toObject();
+
+        return res.status(200).json({
+            msg: "Solicita al cliente revisar su correo electrónico para confirmar su cuenta",
+            cliente: clienteSinPassword,
+        });
+  
+    } catch (error) {
+      res.status(500).json({ msg: "Error al crear cliente", error: error.message });
+    }
+  };
+
+  const updateClienteAdmin = async (req, res) => {
+    const { id } = req.params;
+    const camposPermitidos = [
+      "cedula", "nombre", "apellido", "genero", "email",
+      "direccion", "telefono", "fecha_nacimiento"
+    ];
+    const datos = req.body;
+  
+    try {
+      const cliente = await Clientes.findById(id);
+      if (!cliente) return res.status(404).json({ msg: "Cliente no encontrado" });
+  
+      camposPermitidos.forEach(campo => {
+        if (datos[campo] !== undefined) cliente[campo] = datos[campo];
+      });
+  
+      await cliente.save();
+      res.status(200).json({ msg: "Cliente actualizado correctamente" });
+  
+    } catch (error) {
+      res.status(500).json({ msg: "Error al actualizar cliente", error: error.message });
+    }
+  };
+
+  const deleteClienteAdmin = async (req, res) => {
+    const { id } = req.params;
+  
+    try {
+      const cliente = await Clientes.findByIdAndDelete(id);
+  
+      if (!cliente) {
+        return res.status(404).json({ msg: "Cliente no encontrado" });
+      }
+  
+      res.status(200).json({ msg: "Cliente eliminado exitosamente" });
+    } catch (error) {
+      res.status(500).json({ msg: "Error al eliminar cliente", error: error.message });
+    }
+  };
+
 export {
     registerCliente,
     loginCliente,
     updateClienteProfile,
     recuperarContrasenia,
     cambiarContrasenia,
-    confirmEmail
+    confirmEmail,
+
+    getAllClientes,
+    getClienteById,
+    createClienteAdmin,
+    updateClienteAdmin,
+    deleteClienteAdmin
 };

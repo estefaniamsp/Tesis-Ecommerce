@@ -1,14 +1,14 @@
 import mongoose from 'mongoose';
 
 const carritoSchema = new mongoose.Schema({
-    cliente: {
+    cliente_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Clientes',
         required: true
     },
     productos: [
         {
-            producto: {
+            producto_id: {
                 type: mongoose.Schema.Types.ObjectId,
                 ref: 'Productos',
                 required: true
@@ -38,7 +38,7 @@ const carritoSchema = new mongoose.Schema({
     },
     estado: {
         type: String,
-        enum: ['pendiente', 'finalizado', 'cancelado'],
+        enum: ['pendiente', 'finalizado'],
         default: 'pendiente'
     }
 });

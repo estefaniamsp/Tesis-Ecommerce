@@ -6,7 +6,10 @@ import mongoose from "mongoose";
 // Obtener todas las ventas
 const getAllVentasController = async (req, res) => {
   try {
-    const ventas = await Ventas.find().populate("cliente", "nombre apellido email").populate("productos.producto", "nombre descripcion precio");
+    const ventas = await Ventas.find()
+      .populate("cliente_id", "nombre apellido email")
+      .populate("productos.producto_id", "nombre descripcion precio");
+
     res.status(200).json(ventas);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -18,11 +21,25 @@ const getVentaByIDController = async (req, res) => {
   const { id } = req.params;
   try {
     const venta = await Ventas.findById(id)
-      .populate("cliente", "nombre apellido email")
-      .populate("productos.producto", "nombre descripcion precio");
+      .populate("cliente_id", "nombre apellido email")
+      .populate("productos.producto_id", "nombre descripcion precio");
 
-    const status = venta ? 200 : 404;
-    res.status(status).json(venta || { msg: "Venta no encontrada" });
+    if (!venta) {
+      return res.status(404).json({ msg: "Venta no encontrada" });
+    }
+
+    // Formatear la respuesta para que el frontend reciba campos claros
+    const ventaFormateada = {
+      ...venta._doc,
+      cliente: venta.cliente_id,
+      productos: venta.productos.map(p => ({
+        ...p._doc,
+        producto: p.producto_id
+      }))
+    };
+
+    res.status(200).json(ventaFormateada);
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -104,6 +121,81 @@ const createVentaCliente = async (req, res) => {
   }
 };
 
+const createVentaAdmin = async (req, res) => {
+  const { productos, cliente_id } = req.body;
+
+  if (!cliente_id) {
+    return res.status(400).json({ msg: "Debes proporcionar el ID del cliente" });
+  }
+
+  if (!productos || productos.length === 0) {
+    return res.status(400).json({ msg: "Debes agregar al menos un producto" });
+  }
+
+  try {
+    const clienteExistente = await Clientes.findById(cliente_id);
+    if (!clienteExistente) {
+      return res.status(404).json({ msg: "Cliente no encontrado" });
+    }
+
+    let totalVenta = 0;
+    const productosConDetalles = [];
+
+    for (let i = 0; i < productos.length; i++) {
+      const item = productos[i];
+      const { producto_id, cantidad } = item;
+
+      if (!producto_id || !cantidad) {
+        return res.status(400).json({ msg: `Falta producto o cantidad en el índice ${i}` });
+      }
+
+      const producto = await Productos.findById(producto_id);
+      if (!producto) {
+        return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
+      }
+
+      if (producto.stock < cantidad) {
+        return res.status(400).json({ msg: `Stock insuficiente para ${producto.nombre}. Stock disponible: ${producto.stock}` });
+      }
+
+      producto.stock -= cantidad;
+      await producto.save();
+
+      const subtotal = producto.precio * cantidad;
+      totalVenta += subtotal;
+
+      productosConDetalles.push({
+        producto_id: producto._id,
+        cantidad: cantidad,
+        subtotal: subtotal,
+      });
+    }
+
+    const nuevaVenta = new Ventas({
+      cliente_id: clienteExistente._id,
+      productos: productosConDetalles,
+      total: totalVenta,
+      estado: "pendiente",
+    });
+
+    await nuevaVenta.save();
+
+    const ventaSinIdsInternos = {
+      ...nuevaVenta._doc,
+      productos: nuevaVenta.productos.map(p => {
+        const { _id, ...resto } = p._doc;
+        return resto;
+      })
+    };
+
+    res.status(201).json({ msg: "Venta creada exitosamente", venta: ventaSinIdsInternos });
+
+  } catch (error) {
+    console.error("Error al crear venta por admin:", error);
+    res.status(500).json({ msg: "Error interno del servidor" });
+  }
+};
+
 // Actualizar el estado de una venta
 const updateVentaController = async (req, res) => {
   const { id } = req.params;
@@ -121,13 +213,30 @@ const updateVentaController = async (req, res) => {
 
   try {
     // Actualizar la venta
-    const ventaActualizada = await Ventas.findByIdAndUpdate(id, { estado }, { new: true });
+    const ventaActualizada = await Ventas.findByIdAndUpdate(
+      id,
+      { estado },
+      { new: true }
+    )
+      .populate("cliente_id", "nombre apellido email")
+      .populate("productos.producto_id", "nombre descripcion precio");
 
     if (!ventaActualizada) {
       return res.status(404).json({ msg: "Venta no encontrada" });
     }
 
-    res.status(200).json({ msg: "Venta actualizada con éxito", venta: ventaActualizada });
+    // Formatear respuesta
+    const ventaFormateada = {
+      ...ventaActualizada._doc,
+      cliente: ventaActualizada.cliente_id,
+      productos: ventaActualizada.productos.map(p => ({
+        ...p._doc,
+        producto: p.producto_id
+      }))
+    };
+
+    res.status(200).json({ msg: "Venta actualizada con éxito", venta: ventaFormateada });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -137,22 +246,42 @@ const updateVentaController = async (req, res) => {
 const deleteVentaController = async (req, res) => {
   const { id } = req.params;
 
-  // Verificar si el ID es válido
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(404).json({ msg: "Lo sentimos, la venta no existe" });
+    return res.status(400).json({ msg: "ID de venta no válido" });
   }
 
   try {
-    // Eliminar la venta
-    const ventaEliminada = await Ventas.findByIdAndDelete(id);
+    const venta = await Ventas.findById(id);
 
-    if (!ventaEliminada) {
+    if (!venta) {
       return res.status(404).json({ msg: "Venta no encontrada" });
     }
 
-    res.status(200).json({ msg: `La venta con id ${id} fue eliminada exitosamente` });
+    // Recuperar stock de productos
+    for (const item of venta.productos) {
+      const producto = await Productos.findById(item.producto_id);
+
+      if (producto) {
+        producto.stock += item.cantidad;
+        await producto.save();
+      }
+    }
+
+    // Eliminar la venta después de ajustar el stock
+    const ventaEliminada = await Ventas.findByIdAndDelete(id);
+
+    res.status(200).json({
+      msg: "Venta eliminada exitosamente y stock recuperado",
+      ventaEliminada: {
+        _id: ventaEliminada._id,
+        total: ventaEliminada.total,
+        estado: ventaEliminada.estado,
+        fecha_venta: ventaEliminada.fecha_venta
+      }
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error al eliminar venta:", error);
+    res.status(500).json({ msg: "Error interno del servidor" });
   }
 };
 
@@ -160,6 +289,7 @@ export {
   getAllVentasController,
   getVentaByIDController,
   createVentaCliente,
+  createVentaAdmin,
   updateVentaController,
   deleteVentaController,
 };

@@ -1,10 +1,15 @@
 import Carritos from "../models/carritos.js";
+import Clientes from "../models/clientes.js";
+import Productos from "../models/productos.js";
 import mongoose from "mongoose";
 
 // Obtener todos los carritos
 const getAllCarritosController = async (req, res) => {
     try {
-        const carritos = await Carritos.find().populate('cliente').populate('productos.producto');
+        const carritos = await Carritos.find()
+            .populate('cliente_id') // esto hace match con el campo del esquema
+            .populate('productos.producto_id'); // igual aquí
+
         res.status(200).json(carritos);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -15,7 +20,7 @@ const getAllCarritosController = async (req, res) => {
 const getCarritoByIDController = async (req, res) => {
     const { id } = req.params;
     try {
-        const carrito = await Carritos.findById(id).populate('cliente').populate('productos.producto');
+        const carrito = await Carritos.findById(id).populate('cliente_id').populate('productos.producto_id');
         const status = carrito ? 200 : 404;
         res.status(status).json(carrito || { msg: "Carrito no encontrado" });
     } catch (error) {
@@ -25,75 +30,186 @@ const getCarritoByIDController = async (req, res) => {
 
 // Crear un carrito
 const createCarritoController = async (req, res) => {
-    const { clienteId, productos } = req.body;
+    const { productos } = req.body;
+    const clienteId = req.clienteBDD._id.toString();
 
-    // Verificar si hay campos vacíos
-    if (!clienteId || productos.length === 0) {
-        return res.status(400).json({ msg: "Lo sentimos, debes llenar todos los campos" });
+    if (!productos || productos.length === 0) {
+        return res.status(400).json({ msg: "Debes agregar al menos un producto" });
     }
 
     try {
-        // Crear y guardar el nuevo carrito
-        const nuevoCarrito = new Carritos(req.body);
+        const clienteExistente = await Clientes.findById(clienteId);
+        if (!clienteExistente) {
+            return res.status(404).json({ msg: "Cliente no encontrado" });
+        }
+
+        let totalCarrito = 0;
+        const productosConDetalles = [];
+
+        for (let i = 0; i < productos.length; i++) {
+            const item = productos[i];
+            const { producto_id, cantidad } = item;
+
+            if (!producto_id || !cantidad) {
+                return res.status(400).json({ msg: `Falta producto o cantidad en el índice ${i}` });
+            }
+
+            const producto = await Productos.findById(producto_id);
+            if (!producto) {
+                return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
+            }
+
+            const subtotal = producto.precio * cantidad;
+            totalCarrito += subtotal;
+
+            productosConDetalles.push({
+                producto_id: producto._id,
+                cantidad,
+                precio_unitario: producto.precio,
+                subtotal
+            });
+        }
+
+        const nuevoCarrito = new Carritos({
+            cliente_id: clienteId,
+            productos: productosConDetalles,
+            total: totalCarrito,
+            estado: "pendiente",
+        });
+
         await nuevoCarrito.save();
 
-        res.status(201).json({ msg: "Carrito creado exitosamente", carrito: nuevoCarrito });
+        // Generar respuesta con disponibilidad actual
+        const productosConDisponibilidad = await Promise.all(
+            nuevoCarrito.productos.map(async (p) => {
+                const producto = await Productos.findById(p.producto_id);
+                return {
+                    producto_id: p.producto_id,
+                    cantidad: p.cantidad,
+                    precio_unitario: p.precio_unitario,
+                    subtotal: p.subtotal,
+                    disponible: producto.stock >= p.cantidad
+                };
+            })
+        );
+
+        const carritoFinal = {
+            ...nuevoCarrito._doc,
+            productos: productosConDisponibilidad
+        };
+
+        res.status(201).json({
+            msg: "Carrito creado exitosamente",
+            carrito: carritoFinal
+        });
+
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error("Error al crear carrito:", error);
+        res.status(500).json({ msg: "Error interno del servidor" });
     }
 };
 
 // Actualizar un carrito
 const updateCarritoController = async (req, res) => {
     const { id } = req.params;
-    const { productos, total, estado } = req.body;
+    const { productos, estado } = req.body;
+    const clienteId = req.clienteBDD._id.toString();
 
-    // Verificar si el ID es válido
     if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(404).json({ msg: "Lo sentimos, el carrito no existe" });
+        return res.status(404).json({ msg: "El carrito no existe" });
     }
 
-    // Verificar si hay campos vacíos
     if (!productos || productos.length === 0) {
-        return res.status(400).json({ msg: "Lo sentimos, debes llenar todos los campos" });
+        return res.status(400).json({ msg: "Debes enviar al menos un producto" });
     }
 
     try {
-        // Actualizar el carrito
-        const carritoActualizado = await Carritos.findByIdAndUpdate(id, req.body, { new: true });
-
-        if (!carritoActualizado) {
+        const carrito = await Carritos.findById(id);
+        if (!carrito) {
             return res.status(404).json({ msg: "Carrito no encontrado" });
         }
 
-        res.status(200).json({ msg: "Carrito actualizado con éxito", carrito: carritoActualizado });
+        if (carrito.cliente_id.toString() !== clienteId) {
+            return res.status(403).json({ msg: "No tienes permisos para modificar este carrito" });
+        }
+
+        // Verificar stock de todos los productos antes de actualizar
+        const productosProcesados = [];
+        let total = 0;
+
+        for (const p of productos) {
+            const producto = await Productos.findById(p.producto_id);
+            if (!producto) {
+                return res.status(404).json({ msg: `Producto con ID ${p.producto_id} no encontrado.` });
+            }
+
+            if (producto.stock < p.cantidad) {
+                return res.status(400).json({
+                    msg: `Stock insuficiente para ${producto.nombre}. Stock disponible: ${producto.stock}, solicitado: ${p.cantidad}`
+                });
+            }
+
+            const precio_unitario = producto.precio;
+            const subtotal = precio_unitario * p.cantidad;
+            total += subtotal;
+
+            productosProcesados.push({
+                producto_id: producto._id,
+                cantidad: p.cantidad,
+                precio_unitario,
+                subtotal
+            });
+        }
+
+        // Si pasa todas las validaciones, actualizar el carrito
+        carrito.productos = productosProcesados;
+        carrito.total = total;
+        carrito.estado = estado || carrito.estado;
+
+        await carrito.save();
+
+        res.status(200).json({
+            msg: "Carrito actualizado con éxito",
+            carrito
+        });
+
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error("Error al actualizar carrito:", error);
+        res.status(500).json({ msg: "Error interno del servidor" });
     }
 };
 
 // Eliminar un carrito
 const deleteCarritoController = async (req, res) => {
     const { id } = req.params;
+    const clienteId = req.clienteBDD._id.toString();
 
     // Verificar si el ID es válido
     if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(404).json({ msg: "Lo sentimos, el carrito no existe" });
+        return res.status(404).json({ msg: "El carrito no existe" });
     }
 
     try {
-        // Buscar y eliminar el carrito
-        const carritoEliminado = await Carritos.findByIdAndDelete(id);
+        const carrito = await Carritos.findById(id);
 
-        if (!carritoEliminado) {
+        if (!carrito) {
             return res.status(404).json({ msg: "Carrito no encontrado" });
         }
 
+        // Validar que el carrito pertenece al cliente autenticado
+        if (carrito.cliente_id.toString() !== clienteId) {
+            return res.status(403).json({ msg: "No tienes permisos para eliminar este carrito" });
+        }
+
+        await carrito.deleteOne();
+
         res.status(200).json({ msg: `El carrito con id ${id} fue eliminado exitosamente` });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error("Error al eliminar carrito:", error);
+        res.status(500).json({ msg: "Error interno del servidor" });
     }
 };
+
 
 export {
     getAllCarritosController,

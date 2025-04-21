@@ -9,6 +9,7 @@ import routerCliente from './routers/cliente_routes.js'
 import routerProducto from './routers/producto_routes.js'
 import routerCategoria from './routers/categoria_routes.js'
 import routerVenta from './routers/venta_routes.js'
+import routerCarrito from './routers/carrito_routes.js'
 import { createAdmin } from './controllers/admin_controller.js';
 
 const app = express()
@@ -32,6 +33,7 @@ app.use('/api',routerCliente)
 app.use('/api',routerProducto)
 app.use('/api',routerCategoria)
 app.use('/api',routerVenta)
+app.use('/api',routerCarrito)
 
 // Rutas 
 app.use((req,res)=>res.status(404).send("Endpoint no encontrado - 404"))

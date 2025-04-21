@@ -3,7 +3,8 @@ import {
     getAllVentasController, 
     getVentaByIDController, 
     createVentaCliente, 
-    updateVentaController, 
+    createVentaAdmin, 
+    updateVentaController,
     deleteVentaController 
 } from '../controllers/venta_controller.js'; 
 import verificarAuthAdmin from '../middlewares/admin_auth.js'; 
@@ -16,6 +17,7 @@ const router = Router();
 router.get('/ventas', verificarAuthAdmin, getAllVentasController);
 router.get('/ventas/:id', verificarAuthAdmin, getVentaByIDController);
 router.post('/ventas', verificarAutenticacion, validarVenta, manejarErrores, createVentaCliente);
+router.post('/ventas/admin', verificarAuthAdmin, validarVenta, manejarErrores, createVentaAdmin);
 router.put('/ventas/:id', verificarAuthAdmin, updateVentaController);
 router.delete('/ventas/:id', verificarAuthAdmin, deleteVentaController);
 

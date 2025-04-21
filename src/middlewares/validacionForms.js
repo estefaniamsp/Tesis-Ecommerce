@@ -189,43 +189,7 @@ export const validarVenta = [
         .withMessage('El campo "cantidad" es obligatorio para cada producto'),
 ];
 
-export const validarFactura = [
-    check("venta_id")
-        .isInt()
-        .withMessage("El ID de la venta debe ser un número entero.")
-        .notEmpty()
-        .withMessage('El campo "venta_id" es obligatorio'),
-
-    check("fecha_factura")
-        .matches(/^\d{4}-\d{2}-\d{2}$/)
-        .withMessage("El formato de la fecha de la factura debe ser YYYY-MM-DD.")
-        .notEmpty()
-        .withMessage('El campo "fecha_factura" es obligatorio'),
-
-    check("total")
-        .isDecimal()
-        .withMessage("El total de la factura debe ser un número decimal.")
-        .notEmpty()
-        .withMessage('El campo "total" es obligatorio'),
-
-    check("estado")
-        .isIn(["pendiente", "pagada", "anulada"])
-        .withMessage("El estado debe ser uno de los siguientes: 'pendiente', 'pagada', 'anulada'.")
-        .notEmpty()
-        .withMessage('El campo "estado" es obligatorio'),
-
-    check("descripcion")
-        .optional()
-        .isLength({ min: 5, max: 200 })
-        .withMessage("La descripción debe tener entre 5 y 200 caracteres."),
-];
-
 export const validarCarrito = [
-    check("cliente_id")
-        .isInt()
-        .withMessage("El ID del cliente debe ser un número entero.")
-        .notEmpty()
-        .withMessage('El campo "cliente_id" es obligatorio'),
 
     check("productos")
         .isArray({ min: 1 })
@@ -234,7 +198,7 @@ export const validarCarrito = [
         .withMessage('El campo "productos" es obligatorio'),
 
     check("productos.*.producto_id")
-        .isInt()
+        .isMongoId()
         .withMessage("Cada producto debe tener un ID válido.")
         .notEmpty()
         .withMessage('El campo "producto_id" es obligatorio para cada producto'),
@@ -244,18 +208,6 @@ export const validarCarrito = [
         .withMessage("La cantidad de cada producto debe ser un número entero mayor o igual a 1.")
         .notEmpty()
         .withMessage('El campo "cantidad" es obligatorio para cada producto'),
-
-    check("total")
-        .isDecimal()
-        .withMessage("El total debe ser un número decimal.")
-        .notEmpty()
-        .withMessage('El campo "total" es obligatorio'),
-
-    check("estado")
-        .isIn(["pendiente", "completado", "cancelado"])
-        .withMessage("El estado debe ser uno de los siguientes: 'pendiente', 'completado', 'cancelado'.")
-        .notEmpty()
-        .withMessage('El campo "estado" es obligatorio'),
 ];
 
 // Validación para que solo el admin pueda cambiar o recuperar su contraseña
