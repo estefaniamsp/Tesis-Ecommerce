@@ -17,6 +17,19 @@ const productoSchema = new Schema(
       type: [String],
       validate: [array => array.length <= 3, "Máximo 3 beneficios"],
     },
+
+    ingredientes: {
+      type: [String], // ej: ["Avena", "Miel"]
+      validate: [arr => arr.length >= 2, "Debes seleccionar al menos 2 ingredientes"]
+    },
+    aroma: {
+      type: String, // ej: "Vainilla"
+      required: true,
+    },
+    tipo: {
+      type: String, // ej: "Piel seca"
+      required: true,
+    },
     precio: {
       type: Number,
       required: true,
@@ -28,7 +41,7 @@ const productoSchema = new Schema(
     },
     imagen_id: {
       type: String,
-      required: false, 
+      required: false,
     },
     stock: {
       type: Number,

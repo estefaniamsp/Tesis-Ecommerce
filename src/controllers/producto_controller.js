@@ -43,66 +43,103 @@ const getProductoByIDController = async (req, res) => {
 
 // Crear un nuevo producto
 const createProductoController = async (req, res) => {
-  const { nombre, descripcion, precio, id_categoria, stock } = req.body;
+  const {
+    nombre,
+    descripcion,
+    precio,
+    id_categoria,
+    stock,
+    aroma,
+    tipo,
+    ingredientes
+  } = req.body;
+
   let beneficios = req.body.beneficios;
 
-  // Validaciones básicas
-  if (!nombre || !descripcion || !beneficios || !precio || !stock || !id_categoria) {
-    console.log(req.body);
-    return res.status(400).json({ msg: "Todos los campos son necesarios" });
-  }
-
-  if (isNaN(precio) || precio <= 0) {
-    return res.status(400).json({ msg: "El precio debe ser un número positivo" });
-  }
-
+  // 🧼 Normalizar beneficios
   if (!beneficios) {
     beneficios = [];
   } else if (typeof beneficios === "string") {
     beneficios = [beneficios];
   }
 
-  // Verifica si llegó un archivo (imagen)
+  // 🧼 Normalizar ingredientes
+  let parsedIngredientes = [];
+  if (!ingredientes) {
+    parsedIngredientes = [];
+  } else if (typeof ingredientes === "string") {
+    parsedIngredientes = [ingredientes];
+  } else if (Array.isArray(ingredientes)) {
+    parsedIngredientes = ingredientes;
+  }
+
+  // 📌 Validaciones básicas
+  if (!nombre || !descripcion || !precio || !stock || !id_categoria || !aroma || !tipo) {
+    return res.status(400).json({ msg: "Todos los campos son obligatorios" });
+  }
+
+  if (parsedIngredientes.length < 2) {
+    return res.status(400).json({ msg: "Debes seleccionar al menos 2 ingredientes" });
+  }
+
+  if (isNaN(precio) || precio <= 0) {
+    return res.status(400).json({ msg: "El precio debe ser un número positivo" });
+  }
+
   if (!req.file) {
     return res.status(400).json({ msg: "La imagen del producto es obligatoria" });
   }
 
   try {
-    // Verifica si ya existe un producto con ese nombre
     const productoExistente = await Producto.findOne({ nombre });
     if (productoExistente) {
       return res.status(400).json({ msg: "El producto con ese nombre ya existe" });
     }
 
-    // Obtiene la URL segura de la imagen subida a Cloudinary
     const imagen = req.file.path;
     const imagen_id = req.file.filename;
 
-    // Crea el nuevo producto
     const nuevoProducto = new Producto({
       nombre,
       descripcion,
       beneficios,
+      ingredientes: parsedIngredientes,
+      aroma,
+      tipo,
       precio,
-      stock, 
-      id_categoria: id_categoria, 
+      stock,
+      id_categoria,
       imagen,
       imagen_id,
     });
 
     await nuevoProducto.save();
 
-    return res.status(201).json({ msg: "Producto creado exitosamente", producto: nuevoProducto });
+    return res.status(201).json({
+      msg: "Producto creado exitosamente",
+      producto: nuevoProducto,
+    });
   } catch (error) {
-    console.error(error);
+    console.error("Error al crear el producto:", error);
     return res.status(500).json({ msg: "Error al crear el producto", error });
   }
 };
 
+
 // Actualizar un producto
 const updateProductoController = async (req, res) => {
   const { id } = req.params;
-  const { nombre, descripcion, precio, cantidad, categoria, imagen } = req.body;
+  const {
+    nombre,
+    descripcion,
+    precio,
+    cantidad,
+    categoria,
+    beneficios,
+    ingredientes,
+    aroma,
+    tipo
+  } = req.body;
 
   // Verificar si el ID es válido
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -120,38 +157,61 @@ const updateProductoController = async (req, res) => {
       return res.status(400).json({ msg: "El precio debe ser un número positivo" });
     }
 
-    if (cantidad && (isNaN(cantidad) || cantidad <= 0)) {
-      return res.status(400).json({ msg: "La cantidad debe ser un número positivo" });
+    if (cantidad && (isNaN(cantidad) || cantidad < 0)) {
+      return res.status(400).json({ msg: "El stock debe ser un número positivo o 0" });
+    }
+
+    // Normalizar beneficios
+    let parsedBeneficios = [];
+    if (beneficios) {
+      parsedBeneficios = typeof beneficios === "string"
+        ? [beneficios]
+        : Array.isArray(beneficios) ? beneficios : [];
+    }
+
+    // Normalizar ingredientes
+    let parsedIngredientes = [];
+    if (ingredientes) {
+      parsedIngredientes = typeof ingredientes === "string"
+        ? [ingredientes]
+        : Array.isArray(ingredientes) ? ingredientes : [];
     }
 
     // Actualizar imagen si llegó una nueva
     if (req.file) {
-      // 1. Eliminar la imagen anterior de Cloudinary si existe
       if (producto.imagen_id) {
         await cloudinary.uploader.destroy(producto.imagen_id);
       }
-
-      // 2. Asignar nueva imagen
       producto.imagen = req.file.path;
       producto.imagen_id = req.file.filename;
     }
 
-    // Actualizar resto de campos
+    // Actualizar el resto de campos si vienen
     producto.nombre = nombre || producto.nombre;
     producto.descripcion = descripcion || producto.descripcion;
     producto.precio = precio || producto.precio;
     producto.stock = cantidad || producto.stock;
     producto.id_categoria = categoria || producto.id_categoria;
+    producto.aroma = aroma || producto.aroma;
+    producto.tipo = tipo || producto.tipo;
+
+    if (parsedBeneficios.length > 0) {
+      producto.beneficios = parsedBeneficios;
+    }
+
+    if (parsedIngredientes.length > 0) {
+      producto.ingredientes = parsedIngredientes;
+    }
 
     await producto.save();
 
     return res.status(200).json({ msg: "Producto actualizado exitosamente", producto });
-
   } catch (error) {
-    console.error(error);
+    console.error("Error al actualizar producto:", error);
     return res.status(500).json({ msg: "Error al actualizar el producto", error });
-  } 
+  }
 };
+
 
 // Eliminar un producto
 const deleteProductoController = async (req, res) => {

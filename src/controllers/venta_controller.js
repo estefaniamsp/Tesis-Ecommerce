@@ -50,7 +50,8 @@ const createVentaCliente = async (req, res) => {
   const { productos } = req.body;
   const clienteId = req.clienteBDD._id.toString();
 
-  if (!productos || productos.length === 0) {
+  // Verificar si productos existe y no está vacío
+  if (!productos || !Array.isArray(productos) || productos.length === 0) {
     return res.status(400).json({ msg: "Debes agregar al menos un producto" });
   }
 
@@ -65,10 +66,16 @@ const createVentaCliente = async (req, res) => {
 
     for (let i = 0; i < productos.length; i++) {
       const item = productos[i];
-      const { producto_id, cantidad } = item;
+      const producto_id = item.producto_id ? item.producto_id.toString().trim() : "";
+      const cantidad = item.cantidad;
 
-      if (!producto_id || !cantidad) {
-        return res.status(400).json({ msg: `Falta producto o cantidad en el índice ${i}` });
+      // Validar campos vacíos o espacios
+      if (!producto_id || producto_id.length === 0) {
+        return res.status(400).json({ msg: `El campo "producto_id" está vacío o mal formado en el índice ${i}` });
+      }
+
+      if (!cantidad || isNaN(cantidad) || cantidad <= 0) {
+        return res.status(400).json({ msg: `El campo "cantidad" es inválido en el índice ${i}` });
       }
 
       const producto = await Productos.findById(producto_id);
@@ -104,7 +111,7 @@ const createVentaCliente = async (req, res) => {
 
     await nuevaVenta.save();
 
-    // 🔥 Filtrar los _id de productos antes de enviar la respuesta
+    // 🔥 Limpiar _id de productos
     const ventaSinIdsInternos = {
       ...nuevaVenta._doc,
       productos: nuevaVenta.productos.map(p => {
@@ -122,13 +129,18 @@ const createVentaCliente = async (req, res) => {
 };
 
 const createVentaAdmin = async (req, res) => {
-  const { productos, cliente_id } = req.body;
+  let { productos, cliente_id } = req.body;
 
+  // Limpiar espacios
+  cliente_id = cliente_id ? cliente_id.toString().trim() : "";
+
+  // Validar cliente_id
   if (!cliente_id) {
     return res.status(400).json({ msg: "Debes proporcionar el ID del cliente" });
   }
 
-  if (!productos || productos.length === 0) {
+  // Validar productos
+  if (!productos || !Array.isArray(productos) || productos.length === 0) {
     return res.status(400).json({ msg: "Debes agregar al menos un producto" });
   }
 
@@ -143,10 +155,16 @@ const createVentaAdmin = async (req, res) => {
 
     for (let i = 0; i < productos.length; i++) {
       const item = productos[i];
-      const { producto_id, cantidad } = item;
+      const producto_id = item.producto_id ? item.producto_id.toString().trim() : "";
+      const cantidad = item.cantidad;
 
-      if (!producto_id || !cantidad) {
-        return res.status(400).json({ msg: `Falta producto o cantidad en el índice ${i}` });
+      // Validaciones estrictas
+      if (!producto_id || producto_id.length === 0) {
+        return res.status(400).json({ msg: `El campo "producto_id" está vacío o mal formado en el índice ${i}` });
+      }
+
+      if (!cantidad || isNaN(cantidad) || cantidad <= 0) {
+        return res.status(400).json({ msg: `El campo "cantidad" es inválido en el índice ${i}` });
       }
 
       const producto = await Productos.findById(producto_id);
@@ -180,6 +198,7 @@ const createVentaAdmin = async (req, res) => {
 
     await nuevaVenta.save();
 
+    //Limpiar _id internos antes de responder
     const ventaSinIdsInternos = {
       ...nuevaVenta._doc,
       productos: nuevaVenta.productos.map(p => {

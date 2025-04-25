@@ -45,12 +45,12 @@ const getCategoriaByIDController = async (req, res) => {
 // Crear una nueva categoría
 const createCategoriaController = async (req, res) => {
   const { nombre, descripcion } = req.body;
-  const imagen = req.file ? req.file.path : '';  // Aquí obtenemos la URL de la imagen subida a Cloudinary
+  const imagen = req.file ? req.file.path : ''; 
   const imagen_id = req.file ? req.file.filename : '';
 
   // Validar que todos los campos necesarios estén presentes
-  if (!nombre || !descripcion) {
-    return res.status(400).json({ msg: "El nombre y la descripción son necesarios" });
+  if (!nombre || !descripcion || !req.file) {
+    return res.status(400).json({ msg: "El nombre, la descripción y la imagen son obligatorios" });
   }
 
   try {

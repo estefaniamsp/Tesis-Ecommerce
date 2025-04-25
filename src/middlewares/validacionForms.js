@@ -1,5 +1,41 @@
 import { check, body, validationResult } from "express-validator";
 
+export const validarLoginAdmin = [
+    check("email")
+        .trim()
+        .notEmpty().withMessage("El campo 'email' es obligatorio"),
+
+    check("password")
+        .trim()
+        .isLength({ min: 8, max: 20 })
+        .withMessage("La contraseña debe tener entre 8 y 20 caracteres.")
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,20}$/)
+        .withMessage("Debe contener al menos una mayúscula, una minúscula, un número y un carácter especial (@$!%*?&).")
+        .notEmpty()
+        .withMessage("El campo 'password' es obligatorio")
+];
+
+export const validarCambioContraseniaAdmin = [
+    check("email")
+        .trim()
+        .notEmpty().withMessage("El campo 'email' es obligatorio"),
+
+    check("nuevaPassword")
+        .trim()
+        .isLength({ min: 8, max: 20 })
+        .withMessage("La contraseña debe tener entre 8 y 20 caracteres.")
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,20}$/)
+        .withMessage("Debe contener al menos una mayúscula, una minúscula, un número y un carácter especial (@$!%*?&).")
+        .notEmpty()
+        .withMessage("El campo 'password' es obligatorio"),
+
+    check("codigoRecuperacion")
+        .trim()
+        .notEmpty().withMessage("El campo 'codigoRecuperacion' es obligatorio")
+        .isLength({ min: 6, max: 6 }).withMessage("El código de recuperación debe tener 6 caracteres.")
+        .isNumeric().withMessage("El código de recuperación solo debe contener números.")
+];
+
 export const validarCliente = [
 
     check("nombre")
@@ -33,12 +69,13 @@ export const validarCliente = [
         .withMessage('El campo "email" es obligatorio'),
 
     check("password")
+        .trim()
         .isLength({ min: 8, max: 20 })
         .withMessage("La contraseña debe tener entre 8 y 20 caracteres.")
-        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*).*$/)
-        .withMessage("Debe contener al menos una mayúscula, una minúscula y un número.")
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,20}$/)
+        .withMessage("Debe contener al menos una mayúscula, una minúscula, un número y un carácter especial (@$!%*?&).")
         .notEmpty()
-        .withMessage('El campo "password" es obligatorio'),
+        .withMessage("El campo 'password' es obligatorio")
 ];
 
 export const validarClientePerfil = [
@@ -93,6 +130,26 @@ export const validarClientePerfil = [
         .withMessage('El campo "fecha_nacimiento" es obligatorio'),
 ];
 
+export const validarCambioContraseniaCliente = [
+    check("email")
+      .trim()
+      .notEmpty().withMessage("El campo 'email' es obligatorio")
+      .isEmail().withMessage("El correo ingresado no es válido"),
+  
+    check("nuevaPassword")
+      .trim()
+      .notEmpty().withMessage("El campo 'nuevaPassword' es obligatorio")
+      .isLength({ min: 8, max: 20 })
+      .withMessage("La nueva contraseña debe tener entre 8 y 20 caracteres.")
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/)
+      .withMessage("La nueva contraseña debe contener una mayúscula, una minúscula, un número y un carácter especial."),
+  
+    check("codigoRecuperacion")
+      .notEmpty().withMessage("El campo 'codigoRecuperacion' es obligatorio")
+      .isNumeric().withMessage("El código de recuperación debe ser un número")
+      .isLength({ min: 6, max: 6 })
+      .withMessage("El código de recuperación debe tener exactamente 6 dígitos"),
+  ];
 
 export const validarProducto = [
     check("nombre")
@@ -117,6 +174,26 @@ export const validarProducto = [
         .notEmpty().withMessage('El campo "stock" es obligatorio')
         .isInt({ min: 0 })
         .withMessage("El stock debe ser un número entero igual o mayor a 0."),
+
+    check("ingredientes")
+        .custom((value, { req }) => {
+            const ingredientes = Array.isArray(req.body.ingredientes)
+                ? req.body.ingredientes
+                : [req.body.ingredientes];
+
+            if (ingredientes.length < 2) {
+                throw new Error("Debes seleccionar al menos 2 ingredientes.");
+            }
+            return true;
+        }),
+
+    check("aroma")
+        .notEmpty()
+        .withMessage("El aroma es obligatorio."),
+
+    check("tipo")
+        .notEmpty()
+        .withMessage("El tipo de piel es obligatorio."),
 
     check("descuento")
         .optional()
@@ -152,6 +229,8 @@ export const validarCategoria = [
     check("nombre")
         .isLength({ min: 3, max: 50 })
         .withMessage("El nombre de la categoría debe tener entre 3 y 50 caracteres.")
+        .matches(/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/)
+        .withMessage("El nombre solo debe contener letras y espacios.")
         .notEmpty()
         .withMessage('El campo "nombre" es obligatorio'),
 
@@ -227,21 +306,22 @@ export const validarAdmin = [
         }),
 
     check("password")
+        .trim()
         .isLength({ min: 8, max: 20 })
         .withMessage("La contraseña debe tener entre 8 y 20 caracteres.")
-        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*).*$/)
-        .withMessage("Debe contener al menos una mayúscula, una minúscula y un número.")
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,20}$/)
+        .withMessage("Debe contener al menos una mayúscula, una minúscula, un número y un carácter especial (@$!%*?&).")
         .notEmpty()
-        .withMessage('El campo "password" es obligatorio'),
+        .withMessage("El campo 'password' es obligatorio"),
 
     check("nuevaPassword")
+        .trim()
         .isLength({ min: 8, max: 20 })
-        .withMessage("La nueva contraseña debe tener entre 8 y 20 caracteres.")
-        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*).*$/)
-        .withMessage("Debe contener al menos una mayúscula, una minúscula y un número.")
-        .optional() // Esta validación solo es necesaria cuando se esté cambiando la contraseña
+        .withMessage("La contraseña debe tener entre 8 y 20 caracteres.")
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,20}$/)
+        .withMessage("Debe contener al menos una mayúscula, una minúscula, un número y un carácter especial (@$!%*?&).")
         .notEmpty()
-        .withMessage('El campo "nuevaPassword" es obligatorio si deseas cambiar la contraseña'),
+        .withMessage("El campo 'password' es obligatorio"),
 
 ];
 

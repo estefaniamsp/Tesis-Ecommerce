@@ -36,5 +36,5 @@ app.use('/api',routerVenta)
 app.use('/api',routerCarrito)
 
 // Rutas 
-app.use((req,res)=>res.status(404).send("Endpoint no encontrado - 404"))
+app.use((req,res)=>res.status(404).json({msg:"Endpoint no encontrado - 404"}))
 export default  app

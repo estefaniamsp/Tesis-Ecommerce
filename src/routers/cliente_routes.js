@@ -19,14 +19,14 @@ import {
 } from "../controllers/cliente_controller.js"
 import verificarAutenticacion from '../middlewares/auth.js'; 
 import verificarAuthAdmin from '../middlewares/admin_auth.js';
-import { validarCliente, manejarErrores, validarClientePerfil } from '../middlewares/validacionForms.js';
+import { validarCliente, manejarErrores, validarCambioContraseniaCliente, validarClientePerfil } from '../middlewares/validacionForms.js';
 
 // Rutas publicas
 router.post("/login", loginCliente);
 router.post("/registro", validarCliente, manejarErrores, registerCliente);
-router.put("/perfil", verificarAutenticacion, validarClientePerfil, updateClienteProfile);
+router.put("/perfil", verificarAutenticacion, validarClientePerfil, manejarErrores, updateClienteProfile);
 router.post("/recuperar-contrasenia", recuperarContrasenia);
-router.post("/cambiar-contrasenia",  cambiarContrasenia);
+router.post("/cambiar-contrasenia", validarCambioContraseniaCliente, manejarErrores, cambiarContrasenia);
 router.get("/confirmarCliente/:token", confirmEmail);
 
 // Rutas privadas (solo para administradores)

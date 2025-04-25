@@ -2,7 +2,7 @@ import Admin from "../models/administrador.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
-import {sendMailToUserAdmin} from "../config/nodemailer.js";
+import { sendMailToUserAdmin } from "../config/nodemailer.js";
 
 const createAdmin = async () => {
     const email = "estefi2000ms2@gmail.com";
@@ -60,7 +60,7 @@ const confirmEmail = async (req, res) => {
         const admin = await Admin.findOne({ token });
 
         if (!admin) {
-            return res.status(404).json({ msg: "Token inválido o expirado"});
+            return res.status(404).json({ msg: "Token inválido o expirado" });
         }
 
         // Confirmar el correo del admin
@@ -77,13 +77,26 @@ const confirmEmail = async (req, res) => {
 
 // 📌 Iniciar sesión de administrador
 const loginAdmin = async (req, res) => {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
+
+    email = email.trim();
+    password = password.trim();
+
+    if (!email && !password) {
+        return res.status(400).json({ msg: "Debes ingresar el email y la contraseña" });
+    }
+    if (!email) {
+        return res.status(400).json({ msg: "El campo 'email' es obligatorio" });
+    }
+    if (!password) {
+        return res.status(400).json({ msg: "El campo 'password' es obligatorio" });
+    }
 
     try {
         const admin = await Admin.findOne({ email });
 
         if (!admin) {
-            return res.status(404).json({ msg: "Administrador no encontrado" });
+            return res.status(404).json({ msg: "Correo o contraseña incorrectos" });
         }
 
         // Verificar si el admin ya ha confirmado su correo
@@ -94,7 +107,7 @@ const loginAdmin = async (req, res) => {
         const passwordCorrecta = await admin.compararPassword(password);
 
         if (!passwordCorrecta) {
-            return res.status(401).json({ msg: "Contraseña incorrecta" });
+            return res.status(401).json({ msg: "Correo o contraseña incorrectos" });
         }
 
         // Generar el token para la sesión del admin
@@ -108,15 +121,30 @@ const loginAdmin = async (req, res) => {
 
 // 📌 Recuperar contraseña
 const recuperarContraseniaController = async (req, res) => {
-    const { email } = req.body;
+    let { email } = req.body;
+
+    email = email.trim().toLowerCase();
+
+    if (!email) {
+        return res.status(400).json({ msg: "El campo 'email' es obligatorio" });
+    }
 
     try {
-        if (email !== "estefi2000ms2@gmail.com") {
-            return res.status(404).json({ msg: "Correo no válido para recuperación" });
+        const admin = await Admin.findOne({ email });
+
+        if (!admin) {
+            return res.status(404).json({ msg: "Administrador no encontrado" });
         }
 
+        // Crear código
         const codigoRecuperacion = Math.floor(100000 + Math.random() * 900000);
 
+        // GUARDAR el código en el admin
+        admin.codigoRecuperacion = codigoRecuperacion.toString();
+        admin.codigoRecuperacionExpires = Date.now() + 10 * 60 * 1000; // 10 minutos desde ahora
+        await admin.save();
+
+        // Configurar transporter
         const transporter = nodemailer.createTransport({
             service: "gmail",
             auth: {
@@ -125,6 +153,7 @@ const recuperarContraseniaController = async (req, res) => {
             },
         });
 
+        // Enviar correo
         await transporter.sendMail({
             from: process.env.USER_MAILTRAP,
             to: email,
@@ -134,13 +163,25 @@ const recuperarContraseniaController = async (req, res) => {
 
         res.json({ msg: "Código de recuperación enviado al correo" });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ msg: "Error al enviar el código de recuperación" });
     }
 };
 
+
 // 📌 Cambiar contraseña
 const cambiarContraseniaController = async (req, res) => {
-    const { email, nuevaPassword } = req.body;
+    let { email, nuevaPassword, codigoRecuperacion } = req.body;
+
+    // Limpiar espacios innecesarios
+    email = email.trim().toLowerCase();
+    nuevaPassword = nuevaPassword.trim();
+    codigoRecuperacion = codigoRecuperacion.trim();
+
+    // Validaciones básicas
+    if (!email || !nuevaPassword || !codigoRecuperacion) {
+        return res.status(400).json({ msg: "Todos los campos son obligatorios" });
+    }
 
     try {
         const admin = await Admin.findOne({ email });
@@ -149,12 +190,27 @@ const cambiarContraseniaController = async (req, res) => {
             return res.status(404).json({ msg: "Administrador no encontrado" });
         }
 
+        // Verificar si el código de recuperación es correcto
+        if (
+            admin.codigoRecuperacion !== codigoRecuperacion ||
+            !admin.codigoRecuperacionExpires ||
+            admin.codigoRecuperacionExpires < Date.now()
+        ) {
+            return res.status(400).json({ msg: "Código de recuperación inválido o expirado" });
+        }
+        // Actualizar contraseña
         const salt = await bcrypt.genSalt(10);
         admin.password = await bcrypt.hash(nuevaPassword, salt);
+
+        // Borrar el código de recuperación usado
+        admin.codigoRecuperacion = null;
+        admin.codigoRecuperacionExpires = null;
+
         await admin.save();
 
         res.json({ msg: "Contraseña cambiada con éxito" });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ msg: "Error al cambiar la contraseña" });
     }
 };

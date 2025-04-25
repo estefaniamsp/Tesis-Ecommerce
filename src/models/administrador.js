@@ -18,8 +18,17 @@ const AdminSchema = new mongoose.Schema({
   confirmEmail: {
     type: Boolean,
     default: false
+  },
+  codigoRecuperacion: {
+    type: String,
+    default: null
+  },
+  codigoRecuperacionExpires: {  
+    type: Date,
+    default: null
   }
 });
+
 
 // Método para comparar contraseñas
 AdminSchema.methods.compararPassword = async function (password) {
