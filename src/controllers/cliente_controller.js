@@ -330,7 +330,15 @@ const cambiarContrasenia = async (req, res) => {
 
 const getAllClientes = async (req, res) => {
   try {
-    const clientes = await Clientes.find().select("-password -token -codigoRecuperacion");
+    let {page, limit} = req.body;
+    page = page || 1; // Número de página desde la query, por defecto 1
+    limit = limit || 10; // Cantidad de registros por página, por defecto 10
+    const skip = (page - 1) * limit; // Cantidad de registros a omitir
+
+    const clientes = await Clientes.find()
+      .select("-password -token -codigoRecuperacion")
+      .skip(skip)
+      .limit(limit);
     res.status(200).json(clientes);
   } catch (error) {
     res.status(500).json({ msg: "Error al obtener los clientes", error: error.message });

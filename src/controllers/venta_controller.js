@@ -6,12 +6,20 @@ import mongoose from "mongoose";
 // Obtener todas las ventas
 const getAllVentasController = async (req, res) => {
   try {
+    let { page, limit } = req.body;
+    page = page || 1; // Número de página desde la query, por defecto 1
+    limit = limit || 10; // Cantidad de registros por página, por defecto 10
+    const skip = (page - 1) * limit;
+
     const ventas = await Ventas.find()
       .populate("cliente_id", "nombre apellido email")
-      .populate("productos.producto_id", "nombre descripcion precio");
+      .populate("productos.producto_id", "nombre descripcion precio")
+      .skip(skip)
+      .limit(limit);
 
     res.status(200).json(ventas);
   } catch (error) {
+    console.error("Error al obtener ventas:", error);
     res.status(500).json({ error: error.message });
   }
 };

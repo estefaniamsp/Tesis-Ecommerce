@@ -6,12 +6,20 @@ import mongoose from "mongoose";
 // Obtener todos los carritos
 const getAllCarritosController = async (req, res) => {
     try {
+        let { page, limit } = req.body;
+        page = page || 1; // Número de página desde la query, por defecto 1
+        limit = limit || 10; // Cantidad de registros por página, por defecto 10
+        const skip = (page - 1) * limit;
+
         const carritos = await Carritos.find()
             .populate('cliente_id') // esto hace match con el campo del esquema
-            .populate('productos.producto_id'); // igual aquí
+            .populate('productos.producto_id') // igual aquí
+            .skip(skip)
+            .limit(limit);
 
         res.status(200).json(carritos);
     } catch (error) {
+        console.error("Error al obtener carritos:", error);
         res.status(500).json({ error: error.message });
     }
 };

@@ -5,7 +5,15 @@ import cloudinary from "../config/cloudinary.js";
 // Obtener todos los productos
 const getAllProductosController = async (req, res) => {
   try {
-    const productos = await Producto.find().populate('id_categoria');
+    let { page, limit } = req.body;
+    page = page || 1; // Página actual, por defecto 1
+    limit = limit || 10; // Registros por página, por defecto 10
+    const skip = (page - 1) * limit;
+
+    const productos = await Producto.find()
+      .populate('id_categoria')
+      .skip(skip)
+      .limit(limit);
 
     if (productos.length === 0) {
       return res.status(404).json({ msg: "No se encontraron productos" });
@@ -13,7 +21,7 @@ const getAllProductosController = async (req, res) => {
 
     return res.status(200).json({ productos });
   } catch (error) {
-    console.error(error);
+    console.error("Error al obtener productos:", error);
     return res.status(500).json({ msg: "Error al obtener los productos", error });
   }
 };
