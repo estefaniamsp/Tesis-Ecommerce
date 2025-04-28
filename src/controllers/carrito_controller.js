@@ -54,15 +54,14 @@ const createCarritoController = async (req, res) => {
         let totalCarrito = 0;
         const productosConDetalles = [];
 
-        for (let i = 0; i < productos.length; i++) {
-            const item = productos[i];
+        for (const item of productos) {
             const { producto_id, cantidad } = item;
 
             if (!producto_id || !cantidad) {
-                return res.status(400).json({ msg: `Falta producto o cantidad en el índice ${i}` });
+                return res.status(400).json({ msg: "Falta producto o cantidad en uno de los productos." });
             }
 
-            const producto = await Productos.findById(producto_id);
+            const producto = await Productos.findById(producto_id.trim());
             if (!producto) {
                 return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
             }
@@ -87,7 +86,7 @@ const createCarritoController = async (req, res) => {
 
         await nuevoCarrito.save();
 
-        // Generar respuesta con disponibilidad actual
+        // Actualizamos disponibilidad
         const productosConDisponibilidad = await Promise.all(
             nuevoCarrito.productos.map(async (p) => {
                 const producto = await Productos.findById(p.producto_id);
@@ -96,7 +95,7 @@ const createCarritoController = async (req, res) => {
                     cantidad: p.cantidad,
                     precio_unitario: p.precio_unitario,
                     subtotal: p.subtotal,
-                    disponible: producto.stock >= p.cantidad
+                    disponible: producto ? producto.stock >= p.cantidad : false
                 };
             })
         );

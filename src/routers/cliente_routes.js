@@ -19,10 +19,10 @@ import {
 } from "../controllers/cliente_controller.js"
 import verificarAutenticacion from '../middlewares/auth.js'; 
 import verificarAuthAdmin from '../middlewares/admin_auth.js';
-import { validarCliente, manejarErrores, validarCambioContraseniaCliente, validarClientePerfil } from '../middlewares/validacionForms.js';
+import { validarLogin, validarCliente, manejarErrores, validarCambioContraseniaCliente, validarClientePerfil } from '../middlewares/validacionForms.js';
 
 // Rutas publicas
-router.post("/login", loginCliente);
+router.post("/login", validarLogin, loginCliente);
 router.post("/registro", validarCliente, manejarErrores, registerCliente);
 router.put("/perfil", verificarAutenticacion, validarClientePerfil, manejarErrores, updateClienteProfile);
 router.post("/recuperar-contrasenia", recuperarContrasenia);

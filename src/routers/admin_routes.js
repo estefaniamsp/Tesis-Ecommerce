@@ -6,9 +6,9 @@ import {
     recuperarContraseniaController,
     cambiarContraseniaController
 } from '../controllers/admin_controller.js';
-import { validarLoginAdmin, validarCambioContraseniaAdmin, manejarErrores } from '../middlewares/validacionForms.js';
+import { validarLogin, validarCambioContraseniaAdmin, manejarErrores } from '../middlewares/validacionForms.js';
 
-router.post('/adminLogin', validarLoginAdmin, manejarErrores, loginAdmin);
+router.post('/adminLogin', validarLogin, manejarErrores, loginAdmin);
 router.get('/confirmarAdmin/:token', confirmEmail);
 router.post('/recuperarContraseniaAdmin', recuperarContraseniaController);
 router.post('/cambiarContraseniaAdmin', validarCambioContraseniaAdmin, manejarErrores, cambiarContraseniaController);
