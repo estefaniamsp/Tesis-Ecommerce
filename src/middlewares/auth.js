@@ -4,25 +4,35 @@ import Clientes from "../models/clientes.js";
 import Admin from "../models/administrador.js";
 // Método para proteger rutas
 const verificarAutenticacion = async (req, res, next) => {
-  // Validación si se está enviando el token
-  if (!req.headers.authorization) return res.status(404).json({ msg: "Lo sentimos, debes proprocionar un token" });
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ msg: "Token no proporcionado o con formato inválido" });
+  }
+
   try {
-    const token = req.headers.authorization.split(" ")[1];
+    const token = authHeader.split(" ")[1];
     const { id } = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.clienteBDD = await Clientes.findById(id).select("-password");
+    const cliente = await Clientes.findById(id).select("-password");
+    if (cliente) {
+      req.clienteBDD = cliente;
+      return next();
+    }
 
-    if (req.clienteBDD)return next();
-    req.adminBDD = await Admin.findById(id).select("-password");
-    if (req.adminBDD)return next();
-    return res.status(404).json({ msg: "Lo sentimos, no tienes permisos para acceder a esta ruta" });
-    
+    const admin = await Admin.findById(id).select("-password");
+    if (admin) {
+      req.adminBDD = admin;
+      return next();
+    }
+
+    return res.status(403).json({ msg: "Acceso denegado: usuario no autorizado" });
+
   } catch (error) {
-
-    const e = new Error("Formato del token no válido")
-    return res.status(404).json({ msg: e.message }) 
+    console.error("Error al verificar token:", error.message);
+    return res.status(401).json({ msg: "Token inválido o expirado" });
   }
-}
+};
 
 // Exportar el método
 export default verificarAutenticacion;

@@ -44,32 +44,30 @@ const getCategoriaByIDController = async (req, res) => {
 
 // Crear una nueva categoría
 const createCategoriaController = async (req, res) => {
-  const { nombre, descripcion } = req.body;
+  let { nombre, descripcion } = req.body;
 
   if (!nombre || !descripcion || !req.file) {
     return res.status(400).json({ msg: "El nombre, la descripción y la imagen son obligatorios" });
   }
 
+  nombre = nombre.trim();
+  descripcion = descripcion.trim();
+
   try {
     const categoriaExistente = await Categoria.findOne({ nombre });
     if (categoriaExistente) {
-      // Eliminar la imagen subida si el nombre ya existe
+      // Eliminar la imagen que ya subió Multer a Cloudinary
       await cloudinary.uploader.destroy(req.file.filename);
       return res.status(400).json({
         msg: "La categoría ya existe. La imagen subida fue eliminada automáticamente."
       });
     }
 
-    // Subir imagen a carpeta "categorias" en Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: "categorias"
-    });
-
     const nuevaCategoria = new Categoria({
       nombre,
       descripcion,
-      imagen: result.secure_url,
-      imagen_id: result.public_id,
+      imagen: req.file.path, // Ya subido por Multer
+      imagen_id: req.file.filename,
     });
 
     await nuevaCategoria.save();
@@ -81,7 +79,7 @@ const createCategoriaController = async (req, res) => {
 
   } catch (error) {
     console.error(error);
-    if (req.file && req.file.filename) {
+    if (req.file?.filename) {
       await cloudinary.uploader.destroy(req.file.filename);
     }
     return res.status(500).json({
@@ -90,7 +88,6 @@ const createCategoriaController = async (req, res) => {
     });
   }
 };
-
 
 // Actualizar una categoría existente
 const updateCategoriaController = async (req, res) => {
@@ -107,23 +104,21 @@ const updateCategoriaController = async (req, res) => {
       return res.status(404).json({ msg: "Categoría no encontrada" });
     }
 
-    // Si llega nueva imagen, reemplazar
+    // Si llega nueva imagen, reemplazar usando la imagen que Multer ya subió
     if (req.file) {
+      // Eliminar imagen anterior de Cloudinary si existe
       if (categoria.imagen_id) {
         await cloudinary.uploader.destroy(categoria.imagen_id);
       }
 
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: "categorias"
-      });
-
-      categoria.imagen = result.secure_url;
-      categoria.imagen_id = result.public_id;
+      // Asignar nueva imagen (ya subida por Multer)
+      categoria.imagen = req.file.path;
+      categoria.imagen_id = req.file.filename;
     }
 
     // Actualizar nombre y descripción si vienen
-    categoria.nombre = nombre || categoria.nombre;
-    categoria.descripcion = descripcion || categoria.descripcion;
+    categoria.nombre = nombre ? nombre.trim() : categoria.nombre;
+    categoria.descripcion = descripcion ? descripcion.trim() : categoria.descripcion;
 
     await categoria.save();
 

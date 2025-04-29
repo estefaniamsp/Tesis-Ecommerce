@@ -61,6 +61,10 @@ const createCarritoController = async (req, res) => {
                 return res.status(400).json({ msg: "Falta producto o cantidad en uno de los productos." });
             }
 
+            if (typeof producto_id !== "string" || !mongoose.Types.ObjectId.isValid(producto_id.trim())) {
+                return res.status(400).json({ msg: `ID de producto inválido: ${producto_id}` });
+            }
+
             const producto = await Productos.findById(producto_id.trim());
             if (!producto) {
                 return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
@@ -86,7 +90,7 @@ const createCarritoController = async (req, res) => {
 
         await nuevoCarrito.save();
 
-        // Actualizamos disponibilidad
+        // Actualizar disponibilidad
         const productosConDisponibilidad = await Promise.all(
             nuevoCarrito.productos.map(async (p) => {
                 const producto = await Productos.findById(p.producto_id);
@@ -123,11 +127,11 @@ const updateCarritoController = async (req, res) => {
     const clienteId = req.clienteBDD._id.toString();
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(404).json({ msg: "El carrito no existe" });
+        return res.status(400).json({ msg: "ID de carrito no válido" });
     }
 
-    if (!productos || productos.length === 0) {
-        return res.status(400).json({ msg: "Debes enviar al menos un producto" });
+    if (!productos || !Array.isArray(productos) || productos.length === 0) {
+        return res.status(400).json({ msg: "Debes enviar al menos un producto válido" });
     }
 
     try {
@@ -140,35 +144,47 @@ const updateCarritoController = async (req, res) => {
             return res.status(403).json({ msg: "No tienes permisos para modificar este carrito" });
         }
 
-        // Verificar stock de todos los productos antes de actualizar
         const productosProcesados = [];
         let total = 0;
 
-        for (const p of productos) {
-            const producto = await Productos.findById(p.producto_id);
-            if (!producto) {
-                return res.status(404).json({ msg: `Producto con ID ${p.producto_id} no encontrado.` });
+        for (const item of productos) {
+            const { producto_id, cantidad } = item;
+
+            if (
+                !producto_id ||
+                typeof producto_id !== "string" ||
+                !mongoose.Types.ObjectId.isValid(producto_id.trim())
+            ) {
+                return res.status(400).json({ msg: `ID de producto inválido: ${producto_id}` });
             }
 
-            if (producto.stock < p.cantidad) {
+            if (!cantidad || typeof cantidad !== "number" || cantidad <= 0) {
+                return res.status(400).json({ msg: `Cantidad inválida para producto: ${producto_id}` });
+            }
+
+            const producto = await Productos.findById(producto_id.trim());
+            if (!producto) {
+                return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
+            }
+
+            if (producto.stock < cantidad) {
                 return res.status(400).json({
-                    msg: `Stock insuficiente para ${producto.nombre}. Stock disponible: ${producto.stock}, solicitado: ${p.cantidad}`
+                    msg: `Stock insuficiente para ${producto.nombre}. Disponible: ${producto.stock}, solicitado: ${cantidad}`
                 });
             }
 
             const precio_unitario = producto.precio;
-            const subtotal = precio_unitario * p.cantidad;
+            const subtotal = precio_unitario * cantidad;
             total += subtotal;
 
             productosProcesados.push({
                 producto_id: producto._id,
-                cantidad: p.cantidad,
+                cantidad,
                 precio_unitario,
                 subtotal
             });
         }
 
-        // Si pasa todas las validaciones, actualizar el carrito
         carrito.productos = productosProcesados;
         carrito.total = total;
         carrito.estado = estado || carrito.estado;

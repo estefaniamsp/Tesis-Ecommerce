@@ -2,47 +2,6 @@ import Promocion from "../models/promociones.js";
 import cloudinary from "../config/cloudinary.js";
 import mongoose from "mongoose";
 
-// Crear una nueva promoción
-const createPromocionController = async (req, res) => {
-    const { nombre, descripcion, fecha_inicio, fecha_fin } = req.body;
-
-    if (!nombre || !descripcion || !fecha_inicio || !fecha_fin) {
-        return res.status(400).json({ msg: "Todos los campos son obligatorios" });
-    }
-
-    if (!req.file) {
-        return res.status(400).json({ msg: "La imagen es obligatoria" });
-    }
-
-    try {
-        const promocionExistente = await Promocion.findOne({ nombre });
-        if (promocionExistente) {
-            return res.status(400).json({ msg: "La promoción ya existe" });
-        }
-
-        // Subir imagen a carpeta específica "promociones"
-        const result = await cloudinary.uploader.upload(req.file.path, {
-            folder: "promociones"
-        });
-
-        const nuevaPromocion = new Promocion({
-            nombre,
-            descripcion,
-            fecha_inicio,
-            fecha_fin,
-            imagen: result.secure_url,
-            imagen_id: result.public_id,
-        });
-
-        await nuevaPromocion.save();
-
-        return res.status(201).json({ msg: "Promoción creada exitosamente", promocion: nuevaPromocion });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ msg: "Error al crear la promoción", error: error.message });
-    }
-};
-
 // Obtener todas las promociones
 const getAllPromocionesController = async (req, res) => {
     try {
@@ -84,6 +43,42 @@ const getPromocionByIdController = async (req, res) => {
     }
 };
 
+// Crear una nueva promoción
+const createPromocionController = async (req, res) => {
+    const { nombre, descripcion, fecha_inicio, fecha_fin } = req.body;
+
+    if (!nombre || !descripcion || !fecha_inicio || !fecha_fin || !req.file) {
+        return res.status(400).json({ msg: "Todos los campos y la imagen son obligatorios" });
+    }
+
+    try {
+        const promocionExistente = await Promocion.findOne({ nombre });
+        if (promocionExistente) {
+            await cloudinary.uploader.destroy(req.file.filename);
+            return res.status(400).json({ msg: "La promoción ya existe. Imagen eliminada." });
+        }
+
+        const result = await cloudinary.uploader.upload(req.file.path, { folder: "promociones" });
+
+        const nuevaPromocion = new Promocion({
+            nombre,
+            descripcion,
+            fecha_inicio,
+            fecha_fin,
+            imagen: result.secure_url,
+            imagen_id: result.public_id,
+        });
+
+        await nuevaPromocion.save();
+
+        return res.status(201).json({ msg: "Promoción creada exitosamente", promocion: nuevaPromocion });
+    } catch (error) {
+        console.error("Error al crear la promoción:", error);
+        if (req.file?.filename) await cloudinary.uploader.destroy(req.file.filename);
+        return res.status(500).json({ msg: "Error al crear la promoción", error: error.message });
+    }
+};
+
 // Actualizar una promoción
 const updatePromocionController = async (req, res) => {
     const { id } = req.params;
@@ -100,12 +95,10 @@ const updatePromocionController = async (req, res) => {
         }
 
         if (req.file) {
-            // Eliminar imagen antigua de la carpeta "promociones"
             if (promocion.imagen_id) {
                 await cloudinary.uploader.destroy(promocion.imagen_id);
             }
 
-            // Subir nueva imagen a carpeta "promociones"
             const result = await cloudinary.uploader.upload(req.file.path, {
                 folder: "promociones"
             });
@@ -123,7 +116,7 @@ const updatePromocionController = async (req, res) => {
 
         return res.status(200).json({ msg: "Promoción actualizada exitosamente", promocion });
     } catch (error) {
-        console.error(error);
+        console.error("Error al actualizar la promoción:", error);
         return res.status(500).json({ msg: "Error al actualizar la promoción", error: error.message });
     }
 };

@@ -3,30 +3,31 @@ import jwt from "jsonwebtoken";
 import Admin from "../models/administrador.js";
 // Método para proteger rutas
 const verificarAuthAdmin = async (req, res, next) => {
-  // Validación si se está enviando el token
-  if (!req.headers.authorization) return res.status(404).json({ msg: "Lo sentimos, debes proporcionar un token" });
+  const authHeader = req.headers.authorization;
+
+  // Si no hay token
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ msg: "Token no proporcionado o con formato inválido" });
+  }
 
   try {
-    // Extraer el token (sin "Bearer")
-    const token = req.headers.authorization.split(" ")[1];
-
-    // Verificar y decodificar el token 
+    const token = authHeader.split(" ")[1];
     const { id, rol } = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Validar que el rol sea "admin"
     if (rol !== "admin") {
       return res.status(403).json({ msg: "Acceso prohibido: No tienes permisos de administrador" });
     }
 
-    // Encontrar al administrador en la base de datos
-    req.adminBDD = await Admin.findById(id).select("-password");
+    const admin = await Admin.findById(id).select("-password");
+    if (!admin) {
+      return res.status(404).json({ msg: "Administrador no encontrado" });
+    }
 
-    if (!req.adminBDD) return res.status(404).json({ msg: "Administrador no encontrado" });
+    req.adminBDD = admin;
+    next();
 
-    // Si todo es correcto, continuar con la siguiente acción
-    return next();
   } catch (error) {
-    console.error("Error en token:", error.message);
+    console.error("Error al verificar token:", error.message);
     return res.status(401).json({ msg: "Token inválido o expirado" });
   }
 };

@@ -1,16 +1,12 @@
 import { check, body, validationResult } from "express-validator";
 
-export const validarLoginAdmin = [
+export const validarLogin = [
     check("email")
         .trim()
         .notEmpty().withMessage("El campo 'email' es obligatorio"),
 
     check("password")
         .trim()
-        .isLength({ min: 8, max: 20 })
-        .withMessage("La contraseña debe tener entre 8 y 20 caracteres.")
-        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,20}$/)
-        .withMessage("Debe contener al menos una mayúscula, una minúscula, un número y un carácter especial (@$!%*?&).")
         .notEmpty()
         .withMessage("El campo 'password' es obligatorio")
 ];
@@ -373,6 +369,6 @@ export const manejarErrores = (req, res, next) => {
     if (errors.isEmpty()) {
         return next();
     } else {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({ msg: "Error de validación de datos. Por favor, revisa los campos enviados.", details: errors.array() });
     }
 };
