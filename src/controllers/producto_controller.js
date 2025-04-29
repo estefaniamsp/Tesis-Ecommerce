@@ -51,7 +51,7 @@ const getProductoByIDController = async (req, res) => {
 
 // Crear un nuevo producto
 const createProductoController = async (req, res) => {
-  let {
+  const {
     nombre,
     descripcion,
     precio,
@@ -64,22 +64,14 @@ const createProductoController = async (req, res) => {
 
   let beneficios = req.body.beneficios;
 
-  // Normalizar
-  nombre = nombre?.trim();
-  descripcion = descripcion?.trim();
-  aroma = aroma?.trim();
-  tipo = tipo?.trim();
-
-  if (!nombre || !descripcion || !precio || !stock || !id_categoria || !aroma || !tipo) {
-    return res.status(400).json({ msg: "Todos los campos son obligatorios" });
-  }
-
+  // Normalizar beneficios
   if (!beneficios) {
     beneficios = [];
   } else if (typeof beneficios === "string") {
     beneficios = [beneficios];
   }
 
+  // Normalizar ingredientes
   let parsedIngredientes = [];
   if (!ingredientes) {
     parsedIngredientes = [];
@@ -87,6 +79,11 @@ const createProductoController = async (req, res) => {
     parsedIngredientes = [ingredientes];
   } else if (Array.isArray(ingredientes)) {
     parsedIngredientes = ingredientes;
+  }
+
+  // Validaciones básicas
+  if (!nombre || !descripcion || !precio || !stock || !id_categoria || !aroma || !tipo) {
+    return res.status(400).json({ msg: "Todos los campos son obligatorios" });
   }
 
   if (parsedIngredientes.length < 2) {
@@ -104,12 +101,12 @@ const createProductoController = async (req, res) => {
   try {
     const productoExistente = await Producto.findOne({ nombre });
     if (productoExistente) {
-      await cloudinary.uploader.destroy(req.file.filename); // Eliminar imagen subida
       return res.status(400).json({ msg: "El producto con ese nombre ya existe" });
     }
 
+    // Subir imagen a carpeta "productos" en Cloudinary
     const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: "productos",
+      folder: "productos"
     });
 
     const nuevoProducto = new Producto({
@@ -132,20 +129,16 @@ const createProductoController = async (req, res) => {
       msg: "Producto creado exitosamente",
       producto: nuevoProducto,
     });
-
   } catch (error) {
     console.error("Error al crear el producto:", error);
-    if (req.file && req.file.filename) {
-      await cloudinary.uploader.destroy(req.file.filename); // Eliminar imagen basura
-    }
-    return res.status(500).json({ msg: "Error al crear el producto", error: error.message });
+    return res.status(500).json({ msg: "Error al crear el producto", error });
   }
 };
 
 // Actualizar un producto
 const updateProductoController = async (req, res) => {
   const { id } = req.params;
-  let {
+  const {
     nombre,
     descripcion,
     precio,
@@ -189,26 +182,27 @@ const updateProductoController = async (req, res) => {
         : Array.isArray(ingredientes) ? ingredientes : [];
     }
 
+    // 🚀 Actualizar imagen subiéndola a carpeta "productos"
     if (req.file) {
       if (producto.imagen_id) {
         await cloudinary.uploader.destroy(producto.imagen_id);
       }
 
       const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: "productos",
+        folder: "productos"
       });
 
       producto.imagen = result.secure_url;
       producto.imagen_id = result.public_id;
     }
 
-    producto.nombre = nombre ? nombre.trim() : producto.nombre;
-    producto.descripcion = descripcion ? descripcion.trim() : producto.descripcion;
+    producto.nombre = nombre || producto.nombre;
+    producto.descripcion = descripcion || producto.descripcion;
     producto.precio = precio || producto.precio;
-    producto.stock = cantidad !== undefined ? cantidad : producto.stock;
+    producto.stock = cantidad || producto.stock;
     producto.id_categoria = categoria || producto.id_categoria;
-    producto.aroma = aroma ? aroma.trim() : producto.aroma;
-    producto.tipo = tipo ? tipo.trim() : producto.tipo;
+    producto.aroma = aroma || producto.aroma;
+    producto.tipo = tipo || producto.tipo;
 
     if (parsedBeneficios.length > 0) {
       producto.beneficios = parsedBeneficios;
@@ -221,10 +215,9 @@ const updateProductoController = async (req, res) => {
     await producto.save();
 
     return res.status(200).json({ msg: "Producto actualizado exitosamente", producto });
-
   } catch (error) {
     console.error("Error al actualizar producto:", error);
-    return res.status(500).json({ msg: "Error al actualizar el producto", error: error.message });
+    return res.status(500).json({ msg: "Error al actualizar el producto", error });
   }
 };
 
