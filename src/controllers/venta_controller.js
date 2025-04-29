@@ -6,21 +6,44 @@ import mongoose from "mongoose";
 // Obtener todas las ventas
 const getAllVentasController = async (req, res) => {
   try {
-    let { page, limit } = req.body;
-    page = page || 1; // Número de página desde la query, por defecto 1
-    limit = limit || 10; // Cantidad de registros por página, por defecto 10
+    // Extraer y convertir los parámetros de consulta
+    let page = parseInt(req.query.page, 10) || 1;
+    let limit = parseInt(req.query.limit, 10) || 10;
+
+    // Validar que 'page' y 'limit' sean números enteros positivos
+    if (page < 1) page = 1;
+    if (limit < 1) limit = 10;
+
     const skip = (page - 1) * limit;
 
+    // Obtener las ventas con paginación y población de referencias
     const ventas = await Ventas.find()
       .populate("cliente_id", "nombre apellido email")
       .populate("productos.producto_id", "nombre descripcion precio")
       .skip(skip)
       .limit(limit);
 
-    res.status(200).json(ventas);
+    // Contar el total de ventas
+    const totalVentas = await Ventas.countDocuments();
+
+    // Calcular el total de páginas
+    const totalPaginas = Math.ceil(totalVentas / limit);
+
+    // Verificar si se encontraron ventas
+    if (ventas.length === 0) {
+      return res.status(404).json({ msg: "No se encontraron ventas" });
+    }
+
+    // Responder con las ventas y la información de paginación
+    return res.status(200).json({
+      totalVentas,
+      totalPaginas,
+      paginaActual: page,
+      ventas
+    });
   } catch (error) {
     console.error("Error al obtener ventas:", error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ msg: "Error al obtener las ventas", error: error.message });
   }
 };
 

@@ -5,24 +5,44 @@ import mongoose from "mongoose";
 // Obtener todas las promociones
 const getAllPromocionesController = async (req, res) => {
     try {
-        let { page, limit } = req.body;
-        page = page || 1; // Página actual, por defecto 1
-        limit = limit || 10; // Registros por página, por defecto 10
-        const skip = (page - 1) * limit;
-
-        const promociones = await Promocion.find()
-            .skip(skip)
-            .limit(limit);
-
-        if (promociones.length === 0) {
-            return res.status(404).json({ msg: "No se encontraron promociones" });
-        }
-        return res.status(200).json({ promociones });
+      // Extraer y convertir los parámetros de consulta
+      let page = parseInt(req.query.page, 10) || 1;
+      let limit = parseInt(req.query.limit, 10) || 10;
+  
+      // Validar que 'page' y 'limit' sean números enteros positivos
+      if (page < 1) page = 1;
+      if (limit < 1) limit = 10;
+  
+      const skip = (page - 1) * limit;
+  
+      // Obtener las promociones con paginación
+      const promociones = await Promocion.find()
+        .skip(skip)
+        .limit(limit);
+  
+      // Contar el total de promociones
+      const totalPromociones = await Promocion.countDocuments();
+  
+      // Calcular el total de páginas
+      const totalPaginas = Math.ceil(totalPromociones / limit);
+  
+      // Verificar si se encontraron promociones
+      if (promociones.length === 0) {
+        return res.status(404).json({ msg: "No se encontraron promociones" });
+      }
+  
+      // Responder con las promociones y la información de paginación
+      return res.status(200).json({
+        totalPromociones,
+        totalPaginas,
+        paginaActual: page,
+        promociones
+      });
     } catch (error) {
-        console.error(error);
-        return res.status(500).json({ msg: "Error al obtener promociones", error: error.message });
+      console.error("Error al obtener promociones:", error);
+      return res.status(500).json({ msg: "Error al obtener las promociones", error: error.message });
     }
-};
+  };  
 
 // Obtener una promoción por ID
 const getPromocionByIdController = async (req, res) => {
