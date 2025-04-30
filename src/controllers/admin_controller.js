@@ -75,7 +75,7 @@ const confirmEmail = async (req, res) => {
     }
 };
 
-// 📌 Iniciar sesión de administrador
+// Iniciar sesión de administrador
 const loginAdmin = async (req, res) => {
     let { email, password } = req.body;
 
@@ -119,7 +119,7 @@ const loginAdmin = async (req, res) => {
     }
 };
 
-// 📌 Recuperar contraseña
+// Recuperar contraseña
 const recuperarContraseniaController = async (req, res) => {
     let { email } = req.body;
 
@@ -169,7 +169,7 @@ const recuperarContraseniaController = async (req, res) => {
 };
 
 
-// 📌 Cambiar contraseña
+// Cambiar contraseña
 const cambiarContraseniaController = async (req, res) => {
     let { email, nuevaPassword, codigoRecuperacion } = req.body;
 

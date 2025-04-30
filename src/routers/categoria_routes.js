@@ -14,8 +14,12 @@ const router = Router();
 
 router.get('/categorias', getAllCategoriasController);
 router.get('/categorias/:id', getCategoriaByIDController);
-router.post('/categorias', verificarAuthAdmin, upload.single('imagen'), validarCategoria, manejarErrores, createCategoriaController);
-router.put('/categorias/:id', verificarAuthAdmin, upload.single('imagen'), updateCategoriaController);
+router.post('/categorias', verificarAuthAdmin,(req, res, next) => {req.folderName = "categorias";
+    next();
+}, upload.single('imagen'), validarCategoria, manejarErrores, createCategoriaController);
+router.put('/categorias/:id', (req, res, next) => {req.folderName = "categorias";
+    next();
+}, verificarAuthAdmin, upload.single('imagen'), updateCategoriaController);
 router.delete('/categorias/:id', verificarAuthAdmin, deleteCategoriaController);
 
 export default router;

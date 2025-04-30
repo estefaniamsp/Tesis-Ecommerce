@@ -7,6 +7,7 @@ const clienteSchema = new Schema(
       type: String,
       maxLength: 20,
       trim: true,
+      unique: true,
     },
     nombre: {
       type: String,
@@ -50,10 +51,15 @@ const clienteSchema = new Schema(
       type: String,
       trim: true,
       maxLenght: 10,
+      unique: true,
     },
     codigoRecuperacion: {
-      type: Number,
+      type: String,
       default: null,
+    },
+    codigoRecuperacionExpires: {
+      type: Date,
+      default: null
     },
     password: {
       type: String,
@@ -66,7 +72,15 @@ const clienteSchema = new Schema(
     confirmEmail: {
       type: Boolean,
       default: false
-    }
+    },
+    imagen: {
+      type: String,
+      required: false,
+    },
+    imagen_id: {
+      type: String,
+      required: false,
+    },
   },
   {
     timestamps: true,

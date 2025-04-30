@@ -14,8 +14,12 @@ const router = Router();
 
 router.get("/promociones", getAllPromocionesController);
 router.get("/promociones/:id", getPromocionByIdController);
-router.post("/promociones", verificarAuthAdmin, upload.single("imagen"), validarPromocion, manejarErrores, createPromocionController);
-router.put("/promociones/:id", verificarAuthAdmin, upload.single("imagen"), validarActualizarPromocion, manejarErrores, updatePromocionController);
+router.post("/promociones", verificarAuthAdmin,(req, res, next) => {req.folderName = "promociones";
+  next();
+}, upload.single("imagen"), validarPromocion, manejarErrores, createPromocionController);
+router.put("/promociones/:id", verificarAuthAdmin,(req, res, next) => {req.folderName = "promociones";
+    next();
+}, upload.single("imagen"), validarActualizarPromocion, manejarErrores, updatePromocionController);
 router.delete("/promociones/:id", verificarAuthAdmin, deletePromocionController);
 
 export default router;

@@ -19,12 +19,15 @@ import {
 } from "../controllers/cliente_controller.js"
 import verificarAutenticacion from '../middlewares/auth.js'; 
 import verificarAuthAdmin from '../middlewares/admin_auth.js';
+import upload from "../config/multer.js";
 import { validarLogin, validarCliente, manejarErrores, validarCambioContraseniaCliente, validarClientePerfil } from '../middlewares/validacionForms.js';
 
 // Rutas publicas
 router.post("/login", validarLogin, loginCliente);
 router.post("/registro", validarCliente, manejarErrores, registerCliente);
-router.put("/perfil", verificarAutenticacion, validarClientePerfil, manejarErrores, updateClienteProfile);
+router.put("/perfil", verificarAutenticacion, (req, res, next) => {req.folderName = "clientes";
+    next();
+}, upload.single("imagen"), validarClientePerfil, manejarErrores, updateClienteProfile);
 router.post("/recuperar-contrasenia", recuperarContrasenia);
 router.post("/cambiar-contrasenia", validarCambioContraseniaCliente, manejarErrores, cambiarContrasenia);
 router.get("/confirmarCliente/:token", confirmEmail);
@@ -33,7 +36,9 @@ router.get("/confirmarCliente/:token", confirmEmail);
 router.get("/admin/clientes", verificarAuthAdmin, getAllClientes);
 router.get("/admin/clientes/:id", verificarAuthAdmin, getClienteById);
 router.post("/admin/clientes", verificarAuthAdmin, validarCliente, manejarErrores, createClienteAdmin);
-router.put("/admin/clientes/:id", verificarAuthAdmin, validarCliente, manejarErrores, updateClienteAdmin);
+router.put("/admin/clientes/:id", verificarAuthAdmin,(req, res, next) => {req.folderName = "clientes";
+    next();
+}, upload.single("imagen"), validarClientePerfil, manejarErrores, updateClienteAdmin);
 router.delete("/admin/clientes/:id", verificarAuthAdmin, deleteClienteAdmin);
 
 // Exportar la variable router

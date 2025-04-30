@@ -4,54 +4,57 @@ import Productos from "../models/productos.js";
 import mongoose from "mongoose";
 
 // Obtener todos los carritos
+// Obtener todos los carritos
 const getAllCarritosController = async (req, res) => {
     try {
-      // Extraer y convertir los parámetros de consulta
-      let page = parseInt(req.query.page, 10) || 1;
-      let limit = parseInt(req.query.limit, 10) || 10;
-  
-      // Validar que 'page' y 'limit' sean números enteros positivos
-      if (page < 1) page = 1;
-      if (limit < 1) limit = 10;
-  
-      const skip = (page - 1) * limit;
-  
-      // Obtener los carritos con paginación y población de referencias
-      const carritos = await Carritos.find()
-        .populate('cliente_id') // Población de la referencia al cliente
-        .populate('productos.producto_id') // Población de la referencia a los productos
-        .skip(skip)
-        .limit(limit);
-  
-      // Contar el total de carritos
-      const totalCarritos = await Carritos.countDocuments();
-  
-      // Calcular el total de páginas
-      const totalPaginas = Math.ceil(totalCarritos / limit);
-  
-      // Verificar si se encontraron carritos
-      if (carritos.length === 0) {
-        return res.status(404).json({ msg: "No se encontraron carritos" });
-      }
-  
-      // Responder con los carritos y la información de paginación
-      return res.status(200).json({
-        totalCarritos,
-        totalPaginas,
-        paginaActual: page,
-        carritos
-      });
+        // Extraer y convertir los parámetros de consulta
+        let page = parseInt(req.query.page, 10) || 1;
+        let limit = parseInt(req.query.limit, 10) || 10;
+
+        // Validar que 'page' y 'limit' sean números enteros positivos
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 10;
+
+        const skip = (page - 1) * limit;
+
+        // Obtener los carritos con paginación y población de referencias
+        const carritos = await Carritos.find()
+            .populate({ path: 'cliente_id', select: '-password' }) // Excluir el campo 'password'
+            .populate('productos.producto_id') // Población de la referencia a los productos
+            .skip(skip)
+            .limit(limit);
+
+        // Contar el total de carritos
+        const totalCarritos = await Carritos.countDocuments();
+
+        // Calcular el total de páginas
+        const totalPaginas = Math.ceil(totalCarritos / limit);
+
+        // Verificar si se encontraron carritos
+        if (carritos.length === 0) {
+            return res.status(404).json({ msg: "No se encontraron carritos" });
+        }
+
+        // Responder con los carritos y la información de paginación
+        return res.status(200).json({
+            totalCarritos,
+            totalPaginas,
+            paginaActual: page,
+            carritos
+        });
     } catch (error) {
-      console.error("Error al obtener carritos:", error);
-      return res.status(500).json({ msg: "Error al obtener los carritos", error: error.message });
+        console.error("Error al obtener carritos:", error);
+        return res.status(500).json({ msg: "Error al obtener los carritos", error: error.message });
     }
-  };  
+};
 
 // Obtener un carrito por ID
 const getCarritoByIDController = async (req, res) => {
     const { id } = req.params;
     try {
-        const carrito = await Carritos.findById(id).populate('cliente_id').populate('productos.producto_id');
+        const carrito = await Carritos.findById(id)
+            .populate({ path: 'cliente_id', select: '-password' }) // Excluir el campo 'password'
+            .populate('productos.producto_id');
         const status = carrito ? 200 : 404;
         res.status(status).json(carrito || { msg: "Carrito no encontrado" });
     } catch (error) {

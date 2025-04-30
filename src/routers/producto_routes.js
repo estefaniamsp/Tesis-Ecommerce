@@ -14,8 +14,12 @@ const router = Router();
 
 router.get('/productos', getAllProductosController);
 router.get('/productos/:id', getProductoByIDController);
-router.post('/productos', verificarAuthAdmin, upload.single("imagen"), validarProducto, manejarErrores, createProductoController);
-router.put('/productos/:id', verificarAuthAdmin, upload.single("imagen"), updateProductoController);
+router.post('/productos', verificarAuthAdmin,(req, res, next) => {req.folderName = "productos";
+    next();
+}, upload.single("imagen"), validarProducto, manejarErrores, createProductoController);
+router.put('/productos/:id', verificarAuthAdmin,(req, res, next) => {req.folderName = "productos";
+    next();
+}, upload.single("imagen"), updateProductoController);
 router.delete('/productos/:id', verificarAuthAdmin, deleteProductoController);
 
 export default router;

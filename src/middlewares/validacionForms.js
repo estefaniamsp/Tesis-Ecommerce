@@ -76,54 +76,47 @@ export const validarCliente = [
 
 export const validarClientePerfil = [
     check("cedula")
-        .isLength({ min: 10, max: 20 })
-        .withMessage("La cédula debe tener entre 10 y 20 caracteres.")
-        .notEmpty()
-        .withMessage('El campo "cedula" es obligatorio'),
+        .optional()
+        .isLength({ min: 10, max: 10 })
+        .withMessage("La cédula debe tener exactamente 10 dígitos.")
+        .isNumeric()
+        .withMessage("La cédula solo debe contener números."),
 
     check("nombre")
+        .optional()
         .isLength({ min: 3, max: 30 })
         .withMessage("El nombre debe tener entre 3 y 30 caracteres.")
         .isAlpha("es-ES", { ignore: "áéíóúÁÉÍÓÚñÑ " })
-        .withMessage("El nombre solo debe contener letras.")
-        .notEmpty()
-        .withMessage('El campo "nombre" es obligatorio'),
+        .withMessage("El nombre solo debe contener letras."),
 
     check("apellido")
+        .optional()
         .isLength({ min: 3, max: 20 })
         .withMessage("El apellido debe tener entre 3 y 20 caracteres.")
         .isAlpha("es-ES", { ignore: "áéíóúÁÉÍÓÚñÑ " })
-        .withMessage("El apellido solo debe contener letras.")
-        .notEmpty()
-        .withMessage('El campo "apellido" es obligatorio'),
+        .withMessage("El apellido solo debe contener letras."),
 
     check("genero")
-        .isLength({ min: 4, max: 10 })
-        .withMessage("El género debe tener entre 4 y 10 caracteres.")
-        .isAlpha("es-ES", { ignore: "áéíóúÁÉÍÓÚñÑ " })
-        .withMessage("El género solo debe contener letras.")
-        .notEmpty()
-        .withMessage('El campo "genero" es obligatorio'),
+        .optional()
+        .isIn(["masculino", "femenino"])
+        .withMessage("El género debe ser 'masculino' o 'femenino'."),
 
     check("direccion")
+        .optional()
         .isLength({ min: 5, max: 30 })
-        .withMessage("La dirección debe tener entre 5 y 30 caracteres.")
-        .notEmpty()
-        .withMessage('El campo "direccion" es obligatorio'),
+        .withMessage("La dirección debe tener entre 5 y 30 caracteres."),
 
     check("telefono")
+        .optional()
         .isLength({ min: 10, max: 10 })
-        .withMessage("El teléfono debe tener exactamente 10 caracteres.")
+        .withMessage("El teléfono debe tener exactamente 10 dígitos.")
         .isNumeric()
-        .withMessage("El teléfono solo debe contener números.")
-        .notEmpty()
-        .withMessage('El campo "telefono" es obligatorio'),
+        .withMessage("El teléfono solo debe contener números."),
 
     check("fecha_nacimiento")
+        .optional()
         .matches(/^\d{4}-\d{2}-\d{2}$/)
-        .withMessage("El formato debe ser YYYY-MM-DD.")
-        .notEmpty()
-        .withMessage('El campo "fecha_nacimiento" es obligatorio'),
+        .withMessage("La fecha de nacimiento debe tener el formato YYYY-MM-DD."),
 ];
 
 export const validarCambioContraseniaCliente = [
@@ -351,18 +344,18 @@ export const validarPromocion = [
 
 export const validarActualizarPromocion = [
     check("nombre")
-      .optional()
-      .isString().withMessage("El nombre debe ser un texto válido."),
+        .optional()
+        .isString().withMessage("El nombre debe ser un texto válido."),
     check("descripcion")
-      .optional()
-      .isString().withMessage("La descripción debe ser un texto válido."),
+        .optional()
+        .isString().withMessage("La descripción debe ser un texto válido."),
     check("fechaInicio")
-      .optional()
-      .isISO8601().withMessage("La fecha de inicio debe ser válida."),
+        .optional()
+        .isISO8601().withMessage("La fecha de inicio debe ser válida."),
     check("fechaFin")
-      .optional()
-      .isISO8601().withMessage("La fecha de fin debe ser válida."),
-  ];
+        .optional()
+        .isISO8601().withMessage("La fecha de fin debe ser válida."),
+];
 
 export const manejarErrores = (req, res, next) => {
     const errors = validationResult(req);

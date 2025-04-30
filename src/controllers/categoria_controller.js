@@ -108,7 +108,11 @@ const updateCategoriaController = async (req, res) => {
     if (req.file) {
       // Eliminar imagen anterior de Cloudinary si existe
       if (categoria.imagen_id) {
-        await cloudinary.uploader.destroy(categoria.imagen_id);
+        try {
+          await cloudinary.uploader.destroy(categoria.imagen_id);
+        } catch (error) {
+          console.warn("Error al eliminar imagen anterior:", error.message);
+        }
       }
 
       // Asignar nueva imagen (ya subida por Multer)
@@ -143,7 +147,11 @@ const deleteCategoriaController = async (req, res) => {
 
     // 2. Eliminar la imagen de Cloudinary (si tiene imagen_id)
     if (categoria.imagen_id) {
-      await cloudinary.uploader.destroy(categoria.imagen_id);
+      try {
+        await cloudinary.uploader.destroy(categoria.imagen_id);
+      } catch (error) {
+        console.warn("No se pudo eliminar la imagen en Cloudinary:", error.message);
+      }
     }
 
     // 3. Eliminar la categoría de la base de datos

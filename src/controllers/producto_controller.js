@@ -90,8 +90,8 @@ const createProductoController = async (req, res) => {
   beneficios = !beneficios ? [] : typeof beneficios === "string" ? [beneficios] : beneficios;
   let parsedIngredientes = !ingredientes ? [] : typeof ingredientes === "string" ? [ingredientes] : ingredientes;
 
-  if (!nombre || !descripcion || !precio || !stock || !id_categoria || !aroma || !tipo) {
-    return res.status(400).json({ msg: "Todos los campos son obligatorios" });
+  if (!nombre || !descripcion || !precio || !stock || !id_categoria || !aroma || !tipo || !req.file) {
+    return res.status(400).json({ msg: "Todos los campos y la imagen son obligatorios" });
   }
 
   if (parsedIngredientes.length < 2) {
@@ -102,18 +102,12 @@ const createProductoController = async (req, res) => {
     return res.status(400).json({ msg: "El precio debe ser un número positivo" });
   }
 
-  if (!req.file) {
-    return res.status(400).json({ msg: "La imagen del producto es obligatoria" });
-  }
-
   try {
     const productoExistente = await Producto.findOne({ nombre });
     if (productoExistente) {
       await cloudinary.uploader.destroy(req.file.filename);
       return res.status(400).json({ msg: "El producto con ese nombre ya existe. Imagen eliminada." });
     }
-
-    const result = await cloudinary.uploader.upload(req.file.path, { folder: "productos" });
 
     const nuevoProducto = new Producto({
       nombre,
@@ -125,8 +119,8 @@ const createProductoController = async (req, res) => {
       precio,
       stock,
       id_categoria,
-      imagen: result.secure_url,
-      imagen_id: result.public_id,
+      imagen: req.file.path,
+      imagen_id: req.file.filename,
     });
 
     await nuevoProducto.save();
@@ -189,15 +183,15 @@ const updateProductoController = async (req, res) => {
 
     if (req.file) {
       if (producto.imagen_id) {
-        await cloudinary.uploader.destroy(producto.imagen_id);
+        try {
+          await cloudinary.uploader.destroy(producto.imagen_id);
+        } catch (error) {
+          console.warn("No se pudo eliminar la imagen en Cloudinary:", error.message);
+        }
       }
 
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: "productos"
-      });
-
-      producto.imagen = result.secure_url;
-      producto.imagen_id = result.public_id;
+      producto.imagen = req.file.path;
+      producto.imagen_id = req.file.filename;
     }
 
     producto.nombre = nombre ? nombre.trim() : producto.nombre;
@@ -243,7 +237,11 @@ const deleteProductoController = async (req, res) => {
 
     // Eliminar imagen en Cloudinary si existe
     if (producto.imagen_id) {
-      await cloudinary.uploader.destroy(producto.imagen_id);
+      try {
+        await cloudinary.uploader.destroy(producto.imagen_id);
+      } catch (error) {
+        console.warn("No se pudo eliminar la imagen en Cloudinary:", error.message);
+      }
     }
 
     await producto.deleteOne();

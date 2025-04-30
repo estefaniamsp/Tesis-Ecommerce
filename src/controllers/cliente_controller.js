@@ -4,31 +4,31 @@ import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 import mongoose from "mongoose";
 import { sendMailToUser } from "../config/nodemailer.js";
-import e from "express";
+import cloudinary from "../config/cloudinary.js";
 
 // Registrar cliente
 const registerCliente = async (req, res) => {
   let { nombre, apellido, genero, email, password } = req.body;
 
-  // 🧹 Limpiar espacios
+  // Limpiar espacios
   nombre = nombre ? nombre.trim() : "";
   apellido = apellido ? apellido.trim() : "";
   genero = genero ? genero.trim() : "";
   email = email ? email.trim() : "";
   password = password ? password.trim() : "";
 
-  // 📋 Validación de campos vacíos o solo espacios
+  // Validación de campos vacíos o solo espacios
   if (!nombre || !apellido || !genero || !email || !password) {
     return res.status(400).json({ msg: "Todos los campos son obligatorios" });
   }
 
-  // 📋 Validar que el email sea formato correcto
+  // Validar que el email sea formato correcto
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return res.status(400).json({ msg: "El correo ingresado no es válido" });
   }
 
-  // 📋 Verificar si el email ya existe
+  // Verificar si el email ya existe
   const verificarEmailBDD = await Clientes.findOne({ email });
   if (verificarEmailBDD) {
     return res.status(400).json({ msg: "El email ya se encuentra registrado" });
@@ -119,13 +119,13 @@ const loginCliente = async (req, res) => {
     const ClienteBDD = await Clientes.findOne({ email });
 
     if (!ClienteBDD) {
-      return res.status(401).json({ msg: "Credenciales inválidas" });
+      return res.status(401).json({ msg: "Correo o contraseña incorrectos" });
     }
 
     const verificarPassword = await ClienteBDD.matchPassword(password);
 
     if (!verificarPassword) {
-      return res.status(401).json({ msg: "Credenciales inválidas" });
+      return res.status(401).json({ msg: "Correo o contraseña incorrectos" });
     }
 
     const token = generarJWT(ClienteBDD._id, ClienteBDD.nombre);
@@ -145,12 +145,11 @@ const loginCliente = async (req, res) => {
   }
 };
 
-
-// Modificar perfil de cliente
+// Actualizar perfil de cliente
 const updateClienteProfile = async (req, res) => {
   try {
     let { _id } = req.clienteBDD;
-    _id = _id.toString(); // Asegurar que sea string
+    _id = _id.toString();
 
     let {
       cedula,
@@ -163,7 +162,7 @@ const updateClienteProfile = async (req, res) => {
       fecha_nacimiento
     } = req.body;
 
-    // 🧹 Limpiar espacios
+    // Limpiar espacios
     cedula = cedula?.trim();
     nombre = nombre?.trim();
     apellido = apellido?.trim();
@@ -173,41 +172,58 @@ const updateClienteProfile = async (req, res) => {
     telefono = telefono?.trim();
     fecha_nacimiento = fecha_nacimiento?.trim();
 
-    // 📋 Validaciones básicas
-    if (!nombre || !apellido || !genero || !email) {
-      return res.status(400).json({ msg: "Nombre, apellido, género y email son obligatorios" });
+    const cliente = await Clientes.findById(_id);
+    if (!cliente) {
+      return res.status(404).json({ msg: "Cliente no encontrado" });
     }
 
-    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(nombre)) {
+    // Validación de perfil incompleto
+    const camposFaltantes = [];
+    if (!cliente.nombre && !nombre) camposFaltantes.push("nombre");
+    if (!cliente.apellido && !apellido) camposFaltantes.push("apellido");
+    if (!cliente.genero && !genero) camposFaltantes.push("genero");
+    if (!cliente.cedula && !cedula) camposFaltantes.push("cedula");
+    if (!cliente.telefono && !telefono) camposFaltantes.push("telefono");
+    if (!cliente.fecha_nacimiento && !fecha_nacimiento) camposFaltantes.push("fecha_nacimiento");
+
+    if (camposFaltantes.length > 0) {
+      return res.status(400).json({
+        msg: "Debes completar tu perfil antes de editar individualmente.",
+        campos_obligatorios: camposFaltantes
+      });
+    }
+
+    // Validaciones básicas
+    if (nombre && !/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(nombre)) {
       return res.status(400).json({ msg: "El nombre solo debe contener letras" });
     }
 
-    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(apellido)) {
+    if (apellido && !/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(apellido)) {
       return res.status(400).json({ msg: "El apellido solo debe contener letras" });
     }
 
-    if (genero !== "masculino" && genero !== "femenino") {
+    if (genero && genero !== "masculino" && genero !== "femenino") {
       return res.status(400).json({ msg: "El género debe ser 'masculino' o 'femenino'" });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (email && !emailRegex.test(email)) {
       return res.status(400).json({ msg: "El correo ingresado no es válido" });
     }
 
-    if (telefono && (!/^\d{10}$/.test(telefono))) {
+    if (telefono && !/^\d{10}$/.test(telefono)) {
       return res.status(400).json({ msg: "El teléfono debe tener exactamente 10 números" });
+    }
+
+    if (cedula && !/^\d{10}$/.test(cedula)) {
+      return res.status(400).json({ msg: "La cédula debe tener exactamente 10 números" });
     }
 
     if (fecha_nacimiento && !/^\d{4}-\d{2}-\d{2}$/.test(fecha_nacimiento)) {
       return res.status(400).json({ msg: "La fecha de nacimiento debe tener el formato YYYY-MM-DD" });
     }
 
-    const cliente = await Clientes.findById(_id);
-    if (!cliente) {
-      return res.status(404).json({ msg: "Cliente no encontrado" });
-    }
-
+    // Validación de duplicados
     if (email && email !== cliente.email) {
       const emailExistente = await Clientes.findOne({ email });
       if (emailExistente && emailExistente._id.toString() !== _id) {
@@ -215,7 +231,21 @@ const updateClienteProfile = async (req, res) => {
       }
     }
 
-    // ✅ Actualizar solo los campos enviados
+    if (cedula && cedula !== cliente.cedula) {
+      const cedulaExistente = await Clientes.findOne({ cedula });
+      if (cedulaExistente && cedulaExistente._id.toString() !== _id) {
+        return res.status(400).json({ msg: "La cédula ya está registrada por otro cliente" });
+      }
+    }
+
+    if (telefono && telefono !== cliente.telefono) {
+      const telefonoExistente = await Clientes.findOne({ telefono });
+      if (telefonoExistente && telefonoExistente._id.toString() !== _id) {
+        return res.status(400).json({ msg: "El teléfono ya está registrado por otro cliente" });
+      }
+    }
+
+    // Actualizar campos enviados
     if (cedula) cliente.cedula = cedula;
     if (nombre) cliente.nombre = nombre;
     if (apellido) cliente.apellido = apellido;
@@ -224,6 +254,21 @@ const updateClienteProfile = async (req, res) => {
     if (direccion) cliente.direccion = direccion;
     if (telefono) cliente.telefono = telefono;
     if (fecha_nacimiento) cliente.fecha_nacimiento = fecha_nacimiento;
+
+    // Imagen
+    const imagenFile = req.file;
+    if (imagenFile) {
+      if (cliente.imagen_id) {
+        try {
+          await cloudinary.uploader.destroy(cliente.imagen_id);
+        } catch (err) {
+          console.error("Error al borrar imagen anterior:", err.message);
+        }
+      }
+
+      cliente.imagen = imagenFile.path;
+      cliente.imagen_id = imagenFile.filename;
+    }
 
     await cliente.save();
 
@@ -237,7 +282,8 @@ const updateClienteProfile = async (req, res) => {
         email: cliente.email,
         direccion: cliente.direccion,
         telefono: cliente.telefono,
-        fecha_nacimiento: cliente.fecha_nacimiento
+        fecha_nacimiento: cliente.fecha_nacimiento,
+        imagen: cliente.imagen
       }
     });
 
@@ -248,6 +294,7 @@ const updateClienteProfile = async (req, res) => {
     }
   }
 };
+
 
 // Recuperar contraseña (envía un código por email)
 const recuperarContrasenia = async (req, res) => {
@@ -262,7 +309,9 @@ const recuperarContrasenia = async (req, res) => {
     }
 
     const codigoRecuperacion = Math.floor(100000 + Math.random() * 900000);
-    cliente.codigoRecuperacion = codigoRecuperacion;
+    cliente.codigoRecuperacion = codigoRecuperacion.toString();
+    cliente.codigoRecuperacionExpires = Date.now() + 10 * 60 * 1000; // ⏳ 10 minutos
+
     await cliente.save();
 
     const transporter = nodemailer.createTransport({
@@ -287,15 +336,17 @@ const recuperarContrasenia = async (req, res) => {
   }
 };
 
+
 // Cambiar contraseña
 const cambiarContrasenia = async (req, res) => {
   let { email, nuevaPassword, codigoRecuperacion } = req.body;
 
-  // 🔥 Limpiar espacios
-  email = email?.trim();
+  // Limpiar
+  email = email?.trim().toLowerCase();
   nuevaPassword = nuevaPassword?.trim();
+  codigoRecuperacion = codigoRecuperacion?.toString().trim();
 
-  // 🔥 Validar campos
+  // Validaciones básicas
   if (!email || !nuevaPassword || !codigoRecuperacion) {
     return res.status(400).json({ msg: "Todos los campos son obligatorios" });
   }
@@ -307,26 +358,42 @@ const cambiarContrasenia = async (req, res) => {
       return res.status(404).json({ msg: "Cliente no encontrado" });
     }
 
-    // Convertir codigoRecuperacion a número para comparar correctamente
-    const codigoRecuperacionNumber = parseInt(codigoRecuperacion);
+    const codigoGuardado = cliente.codigoRecuperacion?.toString().trim();
+    const ahora = Date.now();
 
-    if (!cliente.codigoRecuperacion || cliente.codigoRecuperacion !== codigoRecuperacionNumber) {
-      return res.status(400).json({ msg: "Código de recuperación incorrecto" });
+    console.log(">> código recibido:", codigoRecuperacion);
+    console.log(">> código guardado:", codigoGuardado);
+    console.log(">> expira en:", new Date(cliente.codigoRecuperacionExpires));
+    console.log(">> ahora es:", new Date());
+
+    // Validación del código
+    if (
+      !/^\d{6}$/.test(codigoRecuperacion) ||
+      !codigoGuardado ||
+      codigoRecuperacion !== codigoGuardado ||
+      !cliente.codigoRecuperacionExpires ||
+      cliente.codigoRecuperacionExpires < ahora
+    ) {
+      return res.status(400).json({ msg: "Código de recuperación inválido o expirado" });
     }
 
-    // Cambiar la contraseña
-    cliente.password = await bcrypt.hash(nuevaPassword, 10);
-    cliente.codigoRecuperacion = null; // Eliminar el código después de cambiar contraseña
+    // Cambiar contraseña
+    const salt = await bcrypt.genSalt(10);
+    cliente.password = await bcrypt.hash(nuevaPassword, salt);
+
+    // Limpiar código usado
+    cliente.codigoRecuperacion = null;
+    cliente.codigoRecuperacionExpires = null;
+
     await cliente.save();
 
     res.json({ msg: "Contraseña cambiada con éxito" });
 
   } catch (error) {
-    console.error(error);
+    console.error("Error al cambiar la contraseña del cliente:", error);
     res.status(500).json({ msg: "Error al cambiar la contraseña" });
   }
 };
-
 
 const getAllClientes = async (req, res) => {
   try {
@@ -441,6 +508,23 @@ const updateClienteAdmin = async (req, res) => {
     const cliente = await Clientes.findById(id);
     if (!cliente) return res.status(404).json({ msg: "Cliente no encontrado" });
 
+    // Reemplazar imagen si se subió una nueva
+    if (req.file) {
+      // Eliminar imagen anterior si existe
+      if (cliente.imagen_id) {
+        try {
+          await cloudinary.uploader.destroy(cliente.imagen_id);
+        } catch (error) {
+          console.warn("No se pudo eliminar la imagen anterior en Cloudinary:", error.message);
+        }
+      }
+
+      // Guardar nueva imagen
+      cliente.imagen = req.file.path;
+      cliente.imagen_id = req.file.filename;
+    }
+
+    // Actualizar los demás campos permitidos
     camposPermitidos.forEach(campo => {
       if (datos[campo] !== undefined) cliente[campo] = datos[campo];
     });
@@ -460,7 +544,11 @@ const deleteClienteAdmin = async (req, res) => {
     const cliente = await Clientes.findByIdAndDelete(id);
 
     if (!cliente) {
-      return res.status(404).json({ msg: "Cliente no encontrado" });
+      try {
+        await cloudinary.uploader.destroy(cliente.imagen_id);
+      } catch (error) {
+        console.warn("No se pudo eliminar la imagen en Cloudinary:", error.message);
+      }
     }
 
     res.status(200).json({ msg: "Cliente eliminado exitosamente" });
