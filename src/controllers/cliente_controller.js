@@ -51,11 +51,17 @@ const registerCliente = async (req, res) => {
     // Guardar en base de datos solo si el correo fue enviado con éxito
     await nuevoCliente.save();
 
-    const { password: _, ...clienteSinPassword } = nuevoCliente.toObject();
+    const {
+      password: _,
+      token: __,
+      codigoRecuperacion,
+      codigoRecuperacionExpires,
+      ...clienteSeguro
+    } = nuevoCliente.toObject();
 
     return res.status(200).json({
       msg: "Revisa tu correo electrónico para confirmar tu cuenta",
-      cliente: clienteSinPassword,
+      cliente: clienteSeguro
     });
 
   } catch (error) {
@@ -325,8 +331,21 @@ const recuperarContrasenia = async (req, res) => {
     await transporter.sendMail({
       from: process.env.USER_MAILTRAP,
       to: email,
-      subject: "Código de recuperación de contraseña",
-      text: `Tu código de recuperación es: ${codigoRecuperacion}`,
+      subject: "🔐 Código de recuperación de contraseña",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #e0e0e0; border-radius: 8px;">
+          <h2 style="color: #2c3e50;">Recuperación de contraseña</h2>
+          <p>Hola,</p>
+          <p>Hemos recibido una solicitud para restablecer tu contraseña. Usa el siguiente código para continuar con el proceso:</p>
+          <div style="font-size: 24px; font-weight: bold; margin: 20px 0; text-align: center; color: #1abc9c;">
+            ${codigoRecuperacion}
+          </div>
+          <p>Este código es válido por 10 minutos.</p>
+          <p>Si no solicitaste este cambio, puedes ignorar este mensaje.</p>
+          <hr style="margin: 30px 0;">
+          <p style="font-size: 12px; color: #888;">Este mensaje fue generado automáticamente, no respondas a este correo.</p>
+        </div>
+      `
     });
 
     res.json({ msg: "Código de recuperación enviado al correo" });
@@ -409,7 +428,7 @@ const getAllClientes = async (req, res) => {
 
     // Obtener los clientes con paginación
     const clientes = await Clientes.find()
-      .select("-password -token -codigoRecuperacion")
+      .select("-password -token -codigoRecuperacion -codigoRecuperacionExpires")
       .skip(skip)
       .limit(limit);
 
@@ -445,7 +464,7 @@ const getClienteById = async (req, res) => {
   }
 
   try {
-    const cliente = await Clientes.findById(id).select("-password -token -codigoRecuperacion");
+    const cliente = await Clientes.findById(id).select("-password -token -codigoRecuperacion -codigoRecuperacionExpires");
 
     if (!cliente) {
       return res.status(404).json({ msg: "Cliente no encontrado" });
@@ -484,11 +503,17 @@ const createClienteAdmin = async (req, res) => {
     // Guardar en base de datos solo si el correo fue enviado con éxito
     await nuevoCliente.save();
 
-    const { password: _, ...clienteSinPassword } = nuevoCliente.toObject();
+    const {
+      password: _,
+      token: __,
+      codigoRecuperacion: ___,
+      codigoRecuperacionExpires: ____,
+      ...clienteSinDatosSensibles
+    } = nuevoCliente.toObject();
 
     return res.status(200).json({
       msg: "Solicita al cliente revisar su correo electrónico para confirmar su cuenta",
-      cliente: clienteSinPassword,
+      cliente: clienteSinDatosSensibles,
     });
 
   } catch (error) {
