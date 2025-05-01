@@ -10,47 +10,53 @@ import cloudinary from "../config/cloudinary.js";
 const registerCliente = async (req, res) => {
   let { nombre, apellido, genero, email, password } = req.body;
 
-  // Limpiar espacios
-  nombre = nombre ? nombre.trim() : "";
-  apellido = apellido ? apellido.trim() : "";
-  genero = genero ? genero.trim() : "";
-  email = email ? email.trim() : "";
-  password = password ? password.trim() : "";
+  nombre = nombre?.trim();
+  apellido = apellido?.trim();
+  genero = genero?.trim();
+  email = email?.trim();
+  password = password?.trim();
 
-  // Validación de campos vacíos o solo espacios
   if (!nombre || !apellido || !genero || !email || !password) {
     return res.status(400).json({ msg: "Todos los campos son obligatorios" });
   }
 
-  // Validar que el email sea formato correcto
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return res.status(400).json({ msg: "El correo ingresado no es válido" });
   }
 
-  // Verificar si el email ya existe
   const verificarEmailBDD = await Clientes.findOne({ email });
   if (verificarEmailBDD) {
     return res.status(400).json({ msg: "El email ya se encuentra registrado" });
   }
 
   try {
-    // Crear cliente y encriptar contraseña
-    const nuevoCliente = new Clientes({ nombre, apellido, genero, email, password });
-    nuevoCliente.password = await nuevoCliente.encryptPassword(password);
-    const token = nuevoCliente.crearToken();
+    // 1. Crear cliente sin token
+    const nuevoCliente = new Clientes({
+      nombre,
+      apellido,
+      genero,
+      email,
+      password: await bcrypt.hash(password, 10)
+    });
 
-    // ENVIAR CORREO ANTES DE GUARDAR
+    // 2. Guardar el cliente
+    await nuevoCliente.save();
+
+    // 3. Generar y asignar token
+    const token = nuevoCliente.crearToken();
+    nuevoCliente.token = token;
+    await nuevoCliente.save(); // Guardar con token
+
+    // 4. Enviar correo
     try {
       await sendMailToUser(email, token);
     } catch (mailError) {
       console.error("Error al enviar el correo:", mailError.message);
-      return res.status(500).json({ msg: "No se pudo enviar el correo de confirmación" });
+      return res.status(500).json({ msg: "Cliente creado, pero falló el envío del correo de confirmación" });
     }
 
-    // Guardar en base de datos solo si el correo fue enviado con éxito
-    await nuevoCliente.save();
-
+    // 5. Respuesta sin campos sensibles
     const {
       password: _,
       token: __,
@@ -73,28 +79,43 @@ const registerCliente = async (req, res) => {
 //  Verificar correo de confirmación
 const confirmEmail = async (req, res) => {
   const { token } = req.params;
-  console.log(token);
+
   if (!token) {
-    return res.status(400).json({ msg: "Token no proporcionado" });
+    return res.status(400).send("<h2>Token no proporcionado</h2>");
   }
 
   try {
     const cliente = await Clientes.findOne({ token });
 
     if (!cliente) {
-      return res.status(404).json({ msg: "Token inválido o expirado " + token });
+      return res.status(404).send(`
+        <div style="font-family: Arial; text-align: center; padding: 50px;">
+          <h2 style="color: #c0392b;">Token inválido o expirado</h2>
+          <p>Por favor solicita uno nuevo.</p>
+        </div>
+      `);
     }
 
     cliente.confirmEmail = true;
-    cliente.token = null; // Limpiar el token
+    cliente.token = null;
     await cliente.save();
 
-    res.status(200).json({ msg: "Correo confirmado exitosamente" });
+    return res.status(200).send(`
+      <div style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+        <h2 style="color: #27ae60;">¡Correo confirmado exitosamente!</h2>
+        <p>Puedes cerrar esta ventana y continuar navegando en la aplicación.</p>
+      </div>
+    `);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ msg: "Error al confirmar el correo" });
+    return res.status(500).send(`
+      <div style="font-family: Arial; text-align: center; padding: 50px;">
+        <h2 style="color: #e74c3c;">Error al confirmar el correo</h2>
+        <p>Intenta nuevamente más tarde.</p>
+      </div>
+    `);
   }
-}
+};
 
 // Iniciar sesión
 const loginCliente = async (req, res) => {
@@ -489,35 +510,48 @@ const createClienteAdmin = async (req, res) => {
   }
 
   try {
-    const nuevoCliente = new Clientes({ nombre, apellido, genero, email, password, confirmEmail: true });
-    nuevoCliente.password = await nuevoCliente.encryptPassword(password);
-    const token = nuevoCliente.crearToken();
+    // 1. Crear cliente sin token
+    const nuevoCliente = new Clientes({
+      nombre,
+      apellido,
+      genero,
+      email,
+      password: await bcrypt.hash(password, 10),
+      confirmEmail: true // Si quieres que se confirme automáticamente desde admin
+    });
 
+    await nuevoCliente.save();
+
+    // 2. Generar token y asignarlo
+    const token = nuevoCliente.crearToken();
+    nuevoCliente.token = token;
+    await nuevoCliente.save();
+
+    // 3. Enviar correo de confirmación
     try {
       await sendMailToUser(email, token);
     } catch (mailError) {
       console.error("Error al enviar el correo:", mailError.message);
-      return res.status(500).json({ msg: "No se pudo enviar el correo de confirmación" });
+      return res.status(500).json({ msg: "Cliente creado, pero falló el envío del correo de confirmación" });
     }
 
-    // Guardar en base de datos solo si el correo fue enviado con éxito
-    await nuevoCliente.save();
-
+    // 4. Retornar cliente sin datos sensibles
     const {
       password: _,
       token: __,
-      codigoRecuperacion: ___,
-      codigoRecuperacionExpires: ____,
-      ...clienteSinDatosSensibles
+      codigoRecuperacion,
+      codigoRecuperacionExpires,
+      ...clienteSeguro
     } = nuevoCliente.toObject();
 
     return res.status(200).json({
       msg: "Solicita al cliente revisar su correo electrónico para confirmar su cuenta",
-      cliente: clienteSinDatosSensibles,
+      cliente: clienteSeguro
     });
 
   } catch (error) {
-    res.status(500).json({ msg: "Error al crear cliente", error: error.message });
+    console.error("Error al crear cliente:", error.message);
+    return res.status(500).json({ msg: "Error al crear cliente", error: error.message });
   }
 };
 
