@@ -1,6 +1,6 @@
 import Carritos from "../models/carritos.js";
 import Clientes from "../models/clientes.js";
-import Productos from "../models/productos.js";
+import Producto from "../models/productos.js";
 import mongoose from "mongoose";
 
 // Obtener todos los carritos
@@ -91,7 +91,7 @@ const createCarritoController = async (req, res) => {
                 return res.status(400).json({ msg: `ID de producto inválido: ${producto_id}` });
             }
 
-            const producto = await Productos.findById(producto_id.trim());
+            const producto = await Producto.findById(producto_id.trim());
             if (!producto) {
                 return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
             }
@@ -119,7 +119,7 @@ const createCarritoController = async (req, res) => {
         // Actualizar disponibilidad
         const productosConDisponibilidad = await Promise.all(
             nuevoCarrito.productos.map(async (p) => {
-                const producto = await Productos.findById(p.producto_id);
+                const producto = await Producto.findById(p.producto_id);
                 return {
                     producto_id: p.producto_id,
                     cantidad: p.cantidad,
@@ -188,7 +188,7 @@ const updateCarritoController = async (req, res) => {
                 return res.status(400).json({ msg: `Cantidad inválida para producto: ${producto_id}` });
             }
 
-            const producto = await Productos.findById(producto_id.trim());
+            const producto = await Producto.findById(producto_id.trim());
             if (!producto) {
                 return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
             }

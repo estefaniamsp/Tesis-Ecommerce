@@ -7,7 +7,7 @@ const clienteSchema = new Schema(
       type: String,
       maxLength: 20,
       trim: true,
-      unique: true,
+      sparse: true,
     },
     nombre: {
       type: String,
@@ -51,7 +51,7 @@ const clienteSchema = new Schema(
       type: String,
       trim: true,
       maxLenght: 10,
-      unique: true,
+      sparse: true,
     },
     codigoRecuperacion: {
       type: String,

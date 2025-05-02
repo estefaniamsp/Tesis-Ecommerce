@@ -1,5 +1,5 @@
 import Ventas from "../models/ventas.js";
-import Productos from "../models/productos.js";
+import Producto from "../models/productos.js";
 import Clientes from "../models/clientes.js";
 import mongoose from "mongoose";
 
@@ -109,7 +109,7 @@ const createVentaCliente = async (req, res) => {
         return res.status(400).json({ msg: `El campo "cantidad" es inválido en el índice ${i}` });
       }
 
-      const producto = await Productos.findById(producto_id);
+      const producto = await Producto.findById(producto_id);
       if (!producto) {
         return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
       }
@@ -198,7 +198,7 @@ const createVentaAdmin = async (req, res) => {
         return res.status(400).json({ msg: `El campo "cantidad" es inválido en el índice ${i}` });
       }
 
-      const producto = await Productos.findById(producto_id);
+      const producto = await Producto.findById(producto_id);
       if (!producto) {
         return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
       }
@@ -309,7 +309,7 @@ const deleteVentaController = async (req, res) => {
 
     // Recuperar stock de productos
     for (const item of venta.productos) {
-      const producto = await Productos.findById(item.producto_id);
+      const producto = await Producto.findById(item.producto_id);
 
       if (producto) {
         producto.stock += item.cantidad;
