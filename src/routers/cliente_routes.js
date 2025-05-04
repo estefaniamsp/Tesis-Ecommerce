@@ -2,7 +2,6 @@ import {Router} from 'express'
 const router = Router()
 // Importar los métodos del controlador 
 import {
-    loginCliente,
     registerCliente,
     updateClienteProfile,
     recuperarContrasenia,
@@ -20,10 +19,9 @@ import {
 import verificarAutenticacion from '../middlewares/auth.js'; 
 import verificarAuthAdmin from '../middlewares/admin_auth.js';
 import upload from "../config/multer.js";
-import { validarLogin, validarCliente, manejarErrores, validarCambioContraseniaCliente, validarClientePerfil } from '../middlewares/validacionForms.js';
+import { validarCliente, manejarErrores, validarCambioContraseniaCliente, validarClientePerfil } from '../middlewares/validacionForms.js';
 
 // Rutas publicas
-router.post("/login", validarLogin, loginCliente);
 router.post("/registro", validarCliente, manejarErrores, registerCliente);
 router.put("/perfil", verificarAutenticacion, (req, res, next) => {req.folderName = "clientes";
     next();

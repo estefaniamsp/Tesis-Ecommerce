@@ -1,4 +1,5 @@
 import Clientes from "../models/clientes.js";
+import Admin from "../models/administrador.js";
 import generarJWT from "../T_helpers/crearJWT.js";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
@@ -27,6 +28,11 @@ const registerCliente = async (req, res) => {
 
   const verificarEmailBDD = await Clientes.findOne({ email });
   if (verificarEmailBDD) {
+    return res.status(400).json({ msg: "El email ya se encuentra registrado" });
+  }
+
+  const verificarEmailBDDAdmin = await Admin.findOne({ email });
+  if (verificarEmailBDDAdmin) {
     return res.status(400).json({ msg: "El email ya se encuentra registrado" });
   }
 

@@ -335,6 +335,71 @@ const deleteVentaController = async (req, res) => {
   }
 };
 
+const getVentasClienteController = async (req, res) => {
+  try {
+    const clienteId = req.clienteBDD._id;
+
+    const ventasCliente = await Ventas.find({ cliente_id: clienteId })
+      .populate("productos.producto_id", "nombre descripcion precio")
+      .sort({ fecha_venta: -1 });
+
+    if (!ventasCliente || ventasCliente.length === 0) {
+      return res.status(404).json({ msg: "No se encontraron ventas asociadas a tu cuenta" });
+    }
+
+    res.status(200).json({ ventas: ventasCliente });
+  } catch (error) {
+    console.error("Error al obtener ventas del cliente:", error);
+    res.status(500).json({ msg: "Error al obtener tus ventas" });
+  }
+};
+
+const getFacturaClienteById = async (req, res) => {
+  const { id } = req.params;
+  const clienteId = req.clienteBDD._id;
+
+  try {
+    const venta = await Ventas.findById(id)
+      .populate("productos.producto_id", "nombre descripcion precio")
+      .populate("cliente_id", "nombre apellido email");
+
+    if (!venta) {
+      return res.status(404).json({ msg: "Venta no encontrada" });
+    }
+
+    // Asegurarse que el cliente solo vea su propia venta
+    if (venta.cliente_id._id.toString() !== clienteId.toString()) {
+      return res.status(403).json({ msg: "No tienes permiso para ver esta venta" });
+    }
+
+    // Formato tipo factura
+    const factura = {
+      fecha: venta.fecha_venta,
+      cliente: {
+        nombre: venta.cliente_id.nombre,
+        apellido: venta.cliente_id.apellido,
+        email: venta.cliente_id.email
+      },
+      productos: venta.productos.map(p => ({
+        nombre: p.producto_id.nombre,
+        descripcion: p.producto_id.descripcion,
+        precio_unitario: p.producto_id.precio,
+        cantidad: p.cantidad,
+        subtotal: p.subtotal
+      })),
+      total: venta.total,
+      estado: venta.estado
+    };
+
+    res.status(200).json({ factura });
+
+  } catch (error) {
+    console.error("Error al obtener factura del cliente:", error);
+    res.status(500).json({ msg: "Error interno del servidor" });
+  }
+};
+
+
 export {
   getAllVentasController,
   getVentaByIDController,
@@ -342,4 +407,6 @@ export {
   createVentaAdmin,
   updateVentaController,
   deleteVentaController,
+  getVentasClienteController,
+  getFacturaClienteById
 };
