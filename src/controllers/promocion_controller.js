@@ -65,10 +65,10 @@ const getPromocionByIdController = async (req, res) => {
 
 // Crear una nueva promoción
 const createPromocionController = async (req, res) => {
-    const { nombre, descripcion, fecha_inicio, fecha_fin } = req.body;
+    const { nombre } = req.body;
 
-    if (!nombre || !descripcion || !fecha_inicio || !fecha_fin || !req.file) {
-        return res.status(400).json({ msg: "Todos los campos y la imagen son obligatorios" });
+    if (!nombre || !req.file) {
+        return res.status(400).json({ msg: "Todos los campos son obligatorios" });
     }
 
     try {
@@ -80,9 +80,6 @@ const createPromocionController = async (req, res) => {
 
         const nuevaPromocion = new Promocion({
             nombre,
-            descripcion,
-            fecha_inicio,
-            fecha_fin,
             imagen: req.file.path,
             imagen_id: req.file.filename,
         });
@@ -100,7 +97,7 @@ const createPromocionController = async (req, res) => {
 // Actualizar una promoción
 const updatePromocionController = async (req, res) => {
     const { id } = req.params;
-    const { nombre, descripcion, fecha_inicio, fecha_fin } = req.body;
+    const { nombre } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ msg: "ID no válido" });
@@ -126,9 +123,6 @@ const updatePromocionController = async (req, res) => {
         }
 
         promocion.nombre = nombre || promocion.nombre;
-        promocion.descripcion = descripcion || promocion.descripcion;
-        promocion.fecha_inicio = fecha_inicio || promocion.fecha_inicio;
-        promocion.fecha_fin = fecha_fin || promocion.fecha_fin;
 
         await promocion.save();
 

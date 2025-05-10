@@ -12,7 +12,8 @@ import {
     getAllClientes,
     createClienteAdmin,
     updateClienteAdmin,
-    deleteClienteAdmin
+    desactiveClienteAdmin,
+    activeClienteAdmin
 
 
 } from "../controllers/cliente_controller.js"
@@ -37,7 +38,8 @@ router.post("/admin/clientes", verificarAuthAdmin, validarCliente, manejarErrore
 router.put("/admin/clientes/:id", verificarAuthAdmin,(req, res, next) => {req.folderName = "clientes";
     next();
 }, upload.single("imagen"), validarClientePerfil, manejarErrores, updateClienteAdmin);
-router.delete("/admin/clientes/:id", verificarAuthAdmin, deleteClienteAdmin);
+router.delete("/admin/clientes/:id", verificarAuthAdmin, desactiveClienteAdmin);
+router.patch("/admin/clientes/activar/:id", verificarAuthAdmin, activeClienteAdmin);
 
 // Exportar la variable router
 export default router  

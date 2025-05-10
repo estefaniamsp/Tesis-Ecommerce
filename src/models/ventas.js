@@ -33,7 +33,7 @@ const ventaSchema = new mongoose.Schema(
         },
         estado: {
             type: String,
-            enum: ['pendiente', 'completada', 'cancelada'],
+            enum: ['pendiente', 'finalizado'],
             default: 'pendiente',
         }
     },

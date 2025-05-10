@@ -46,15 +46,15 @@ const registerCliente = async (req, res) => {
       password: await bcrypt.hash(password, 10)
     });
 
-    // 2. Guardar el cliente
+    // Guardar el cliente
     await nuevoCliente.save();
 
-    // 3. Generar y asignar token
+    // Generar y asignar token
     const token = nuevoCliente.crearToken();
     nuevoCliente.token = token;
     await nuevoCliente.save(); // Guardar con token
 
-    // 4. Enviar correo
+    // Enviar correo
     try {
       await sendMailToUser(email, token);
     } catch (mailError) {
@@ -62,7 +62,7 @@ const registerCliente = async (req, res) => {
       return res.status(500).json({ msg: "Cliente creado, pero falló el envío del correo de confirmación" });
     }
 
-    // 5. Respuesta sin campos sensibles
+    // Respuesta sin campos sensibles
     const {
       password: _,
       token: __,
@@ -127,11 +127,11 @@ const confirmEmail = async (req, res) => {
 const loginCliente = async (req, res) => {
   let { email, password } = req.body;
 
-  // 🧹 Limpiar espacios al inicio y final
+  // Limpiar espacios al inicio y final
   email = email ? email.trim() : "";
   password = password ? password.trim() : "";
 
-  // 📋 Validaciones básicas
+  // Validaciones básicas
   if (!email && !password) {
     return res.status(400).json({ msg: "Debes ingresar el email y la contraseña" });
   }
@@ -142,7 +142,7 @@ const loginCliente = async (req, res) => {
     return res.status(400).json({ msg: "El campo 'password' es obligatorio" });
   }
 
-  // 📋 Validar formato de email
+  // Validar formato de email
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return res.status(400).json({ msg: "El correo ingresado no es válido" });
@@ -153,6 +153,14 @@ const loginCliente = async (req, res) => {
 
     if (!ClienteBDD) {
       return res.status(401).json({ msg: "Correo o contraseña incorrectos" });
+    }
+
+    if (ClienteBDD.estado === "inactivo") {
+      return res.status(401).json({ msg: "Tu cuenta ha sido desactivada" });
+    }
+
+    if (!ClienteBDD.confirmEmail) {
+      return res.status(401).json({ msg: "Debes confirmar tu correo electrónico" });  
     }
 
     const verificarPassword = await ClienteBDD.matchPassword(password);
@@ -602,23 +610,35 @@ const updateClienteAdmin = async (req, res) => {
   }
 };
 
-const deleteClienteAdmin = async (req, res) => {
+const desactiveClienteAdmin = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const cliente = await Clientes.findByIdAndDelete(id);
+    const cliente = await Clientes.findById(id);
+    if (!cliente) return res.status(404).json({ msg: "Cliente no encontrado" });
+    cliente.estado = 'inactivo';
 
-    if (!cliente) {
-      try {
-        await cloudinary.uploader.destroy(cliente.imagen_id);
-      } catch (error) {
-        console.warn("No se pudo eliminar la imagen en Cloudinary:", error.message);
-      }
-    }
+    await cliente.save();
 
-    res.status(200).json({ msg: "Cliente eliminado exitosamente" });
+    res.status(200).json({ msg: "Estado del cliente actualizado a inactivo exitosamente" });
   } catch (error) {
-    res.status(500).json({ msg: "Error al eliminar cliente", error: error.message });
+    res.status(500).json({ msg: "Error al actualizar el estado del cliente", error: error.message });
+  }
+};
+
+const activeClienteAdmin = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const cliente = await Clientes.findById(id);
+    if (!cliente) return res.status(404).json({ msg: "Cliente no encontrado" });
+
+    cliente.estado = 'activo';
+    await cliente.save();
+
+    res.status(200).json({ msg: "Estado del cliente actualizado a activo exitosamente" });
+  } catch (error) {
+    res.status(500).json({ msg: "Error al actualizar el estado del cliente", error: error.message });
   }
 };
 
@@ -634,5 +654,6 @@ export {
   getClienteById,
   createClienteAdmin,
   updateClienteAdmin,
-  deleteClienteAdmin
+  desactiveClienteAdmin,
+  activeClienteAdmin
 };

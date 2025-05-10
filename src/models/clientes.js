@@ -81,6 +81,11 @@ const clienteSchema = new Schema(
       type: String,
       required: false,
     },
+    estado: {
+      type: String,
+      enum: ['activo', 'inactivo'],
+      default: 'activo'
+    }
   },
   {
     timestamps: true,

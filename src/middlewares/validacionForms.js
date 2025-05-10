@@ -357,6 +357,40 @@ export const validarActualizarPromocion = [
         .isISO8601().withMessage("La fecha de fin debe ser válida."),
 ];
 
+export const validarIngrediente = [
+    check("nombre")
+        .isLength({ min: 3, max: 50 })
+        .withMessage("El nombre del ingrediente debe tener entre 3 y 50 caracteres.")
+        .notEmpty()
+        .withMessage('El campo "nombre" es obligatorio'),
+
+    check("stock")
+        .isInt({ min: 0 })
+        .withMessage("El stock debe ser un número entero mayor o igual a 0.")
+        .notEmpty()
+        .withMessage('El campo "stock" es obligatorio'),
+
+    check("precio")
+        .isDecimal()
+        .withMessage("El precio debe ser un número decimal.")
+        .notEmpty()
+        .withMessage('El campo "precio" es obligatorio'),
+
+    check("id_categoria")
+        .notEmpty().withMessage('El campo "id_categoria" es obligatorio')
+        .isMongoId()
+        .withMessage("El id de la categoría debe ser un ObjectId válido."),
+
+    body("imagen")
+        .custom((value, { req }) => {
+            if (!req.file) {
+                throw new Error("La imagen es obligatoria");
+            }
+            return true;
+        }),
+]
+
+
 export const manejarErrores = (req, res, next) => {
     const errors = validationResult(req);
     if (errors.isEmpty()) {
