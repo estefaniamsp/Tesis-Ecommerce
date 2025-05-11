@@ -320,19 +320,6 @@ export const validarPromocion = [
         .notEmpty().withMessage('El campo "nombre" es obligatorio')
         .isLength({ min: 3, max: 100 }).withMessage("El nombre debe tener entre 3 y 100 caracteres."),
 
-    check("descripcion")
-        .trim()
-        .notEmpty().withMessage('El campo "descripcion" es obligatorio')
-        .isLength({ min: 10, max: 500 }).withMessage("La descripción debe tener entre 10 y 500 caracteres."),
-
-    check("fecha_inicio")
-        .notEmpty().withMessage('El campo "fecha_inicio" es obligatorio')
-        .isISO8601().withMessage("La fecha de inicio debe ser una fecha válida (YYYY-MM-DD)."),
-
-    check("fecha_fin")
-        .notEmpty().withMessage('El campo "fecha_fin" es obligatorio')
-        .isISO8601().withMessage("La fecha de fin debe ser una fecha válida (YYYY-MM-DD)."),
-
     body("imagen")
         .custom((value, { req }) => {
             if (!req.file) {
@@ -346,15 +333,6 @@ export const validarActualizarPromocion = [
     check("nombre")
         .optional()
         .isString().withMessage("El nombre debe ser un texto válido."),
-    check("descripcion")
-        .optional()
-        .isString().withMessage("La descripción debe ser un texto válido."),
-    check("fechaInicio")
-        .optional()
-        .isISO8601().withMessage("La fecha de inicio debe ser válida."),
-    check("fechaFin")
-        .optional()
-        .isISO8601().withMessage("La fecha de fin debe ser válida."),
 ];
 
 export const validarIngrediente = [
@@ -389,7 +367,6 @@ export const validarIngrediente = [
             return true;
         }),
 ]
-
 
 export const manejarErrores = (req, res, next) => {
     const errors = validationResult(req);
