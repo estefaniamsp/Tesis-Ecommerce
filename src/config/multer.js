@@ -5,7 +5,7 @@ import cloudinary from './cloudinary.js';
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
-    const folder = req.folderName || 'tesis_imagenes'; // más claro y seguro
+    const folder = req.folderName || 'tesis_imagenes';
     return {
       folder,
       allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
@@ -13,6 +13,16 @@ const storage = new CloudinaryStorage({
   }
 });
 
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 2 * 1024 * 1024 }, 
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos de imagen'), false);
+    }
+  }
+});
 
 export default upload;

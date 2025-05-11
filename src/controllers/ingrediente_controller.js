@@ -17,7 +17,7 @@ const getAllIngredientesController = async (req, res) => {
         const ingredientes = await Ingrediente.find().populate("id_categoria")
             .skip(skip)
             .limit(limit);
-            
+
         if (ingredientes.length === 0) {
             return res.status(404).json({ msg: "No se encontraron ingredientes" });
         }
@@ -58,7 +58,9 @@ const createIngredienteController = async (req, res) => {
     let { nombre, stock, id_categoria, precio } = req.body;
 
     if (!nombre || !stock || !id_categoria || !precio || !req.file) {
-        return res.status(400).json({ msg: "El nombre, el stock, la categoría, el precio y la imagen son obligatorios" });
+        return res.status(400).json({
+            msg: "El nombre, el stock, la categoría, el precio y la imagen son obligatorios"
+        });
     }
 
     nombre = nombre.trim();
@@ -66,29 +68,24 @@ const createIngredienteController = async (req, res) => {
     precio = parseFloat(precio.trim());
 
     try {
-        // Verificar si ya existe el ingrediente
+        // Verificar si ya existe un ingrediente con ese nombre
         const ingredienteExistente = await Ingrediente.findOne({ nombre });
         if (ingredienteExistente) {
-            // Eliminar la imagen que ya subió Multer a Cloudinary
-            await cloudinary.uploader.destroy(req.file.filename);
+            // Eliminar la imagen recién subida por multer-storage-cloudinary
+            await cloudinary.uploader.destroy(req.file.filename); // filename = public_id
             return res.status(400).json({
                 msg: "El ingrediente ya existe. La imagen subida fue eliminada automáticamente."
             });
         }
 
-        // Subir la imagen a Cloudinary
-        const resultado = await cloudinary.uploader.upload(req.file.path, {
-            folder: "ingredientes",
-        });
-
-        // Crear el nuevo ingrediente
+        // Crear el nuevo ingrediente con los datos de la imagen ya subida por multer
         const nuevoIngrediente = new Ingrediente({
             nombre,
             stock,
-            id_categoria, // Cambié categoria por id_categoria
+            id_categoria,
             precio,
-            imagen: resultado.secure_url, // URL de la imagen
-            imagen_id: resultado.public_id, // ID de la imagen en Cloudinary
+            imagen: req.file.path, // ya es secure_url
+            imagen_id: req.file.filename, // es el public_id
         });
 
         await nuevoIngrediente.save();
@@ -100,11 +97,18 @@ const createIngredienteController = async (req, res) => {
 
     } catch (error) {
         console.error(error);
+
+        // Eliminar la imagen si ocurrió un error
         if (req.file?.filename) {
-            await cloudinary.uploader.destroy(req.file.filename);
+            try {
+                await cloudinary.uploader.destroy(req.file.filename);
+            } catch (e) {
+                console.warn("No se pudo eliminar la imagen tras fallo:", e.message);
+            }
         }
+
         return res.status(500).json({
-            msg: "Ocurrió un error interno. La imagen subida fue eliminada.",
+            msg: "Ocurrió un error interno. La imagen fue eliminada si se alcanzó a subir.",
             error: error.message,
         });
     }
@@ -136,29 +140,30 @@ const updateIngredienteController = async (req, res) => {
                 }
             }
 
-            // Subir nueva imagen
-            const resultado = await cloudinary.uploader.upload(req.file.path, {
-                folder: "ingredientes",
-            });
-
             // Asignar nueva imagen (ya subida por Multer)
-            ingrediente.imagen = resultado.secure_url;
-            ingrediente.imagen_id = resultado.public_id;
+            ingrediente.imagen = req.file.path; // secure_url
+            ingrediente.imagen_id = req.file.filename; // public_id
         }
 
         // Actualizar nombre, stock, categoria y precio si vienen
-        ingrediente.nombre = nombre ? nombre.trim() : ingrediente.nombre;
-        ingrediente.stock = stock ? parseInt(stock.trim()) : ingrediente.stock;
-        ingrediente.id_categoria = id_categoria ? id_categoria.trim() : ingrediente.id_categoria;
-        ingrediente.precio = precio ? parseFloat(precio.trim()) : ingrediente.precio;
+        if (nombre) ingrediente.nombre = nombre.trim();
+        if (stock) ingrediente.stock = parseInt(stock.trim());
+        if (id_categoria) ingrediente.id_categoria = id_categoria.trim();
+        if (precio) ingrediente.precio = parseFloat(precio.trim());
 
         await ingrediente.save();
 
-        return res.status(200).json({ msg: "Ingrediente actualizado exitosamente", ingrediente });
+        return res.status(200).json({
+            msg: "Ingrediente actualizado exitosamente",
+            ingrediente
+        });
 
     } catch (error) {
         console.error(error);
-        return res.status(500).json({ msg: "Error al actualizar el ingrediente", error: error.message });
+        return res.status(500).json({
+            msg: "Error al actualizar el ingrediente",
+            error: error.message
+        });
     }
 };
 

@@ -164,18 +164,6 @@ export const validarProducto = [
         .isInt({ min: 0 })
         .withMessage("El stock debe ser un número entero igual o mayor a 0."),
 
-    check("ingredientes")
-        .custom((value, { req }) => {
-            const ingredientes = Array.isArray(req.body.ingredientes)
-                ? req.body.ingredientes
-                : [req.body.ingredientes];
-
-            if (ingredientes.length < 2) {
-                throw new Error("Debes seleccionar al menos 2 ingredientes.");
-            }
-            return true;
-        }),
-
     check("aroma")
         .notEmpty()
         .withMessage("El aroma es obligatorio."),

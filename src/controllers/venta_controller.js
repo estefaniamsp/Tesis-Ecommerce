@@ -114,6 +114,10 @@ const createVentaCliente = async (req, res) => {
         return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
       }
 
+      if (!producto.activo) {
+        return res.status(400).jason({msg: `El producto ${producto.nombre} está descontinuado y no puede ser añadido.`});
+      }
+
       // Verificar stock suficiente
       if (producto.stock < cantidad) {
         return res.status(400).json({ msg: `Stock insuficiente para ${producto.nombre}. Stock disponible: ${producto.stock}` });
@@ -201,6 +205,10 @@ const createVentaAdmin = async (req, res) => {
       const producto = await Producto.findById(producto_id);
       if (!producto) {
         return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
+      }
+
+      if (!producto.activo) {
+        return res.status(400).json({ msg: `El producto ${producto.nombre} está descontinuado y no puede ser añadido.` });
       }
 
       if (producto.stock < cantidad) {

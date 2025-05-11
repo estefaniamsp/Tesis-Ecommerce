@@ -1,4 +1,5 @@
 import Producto from "../models/productos.js";
+import Ingrediente from "../models/ingredientes.js";
 import mongoose from "mongoose";
 import cloudinary from "../config/cloudinary.js";
 
@@ -16,13 +17,14 @@ const getAllProductosController = async (req, res) => {
     const skip = (page - 1) * limit;
 
     // Obtener los productos con paginación y población de la categoría
-    const productos = await Producto.find()
+    const productos = await Producto.find({ activo: true })
       .populate('id_categoria')
+      .populate('ingredientes')
       .skip(skip)
       .limit(limit);
 
     // Contar el total de productos
-    const totalProductos = await Producto.countDocuments();
+    const totalProductos = await Producto.countDocuments({ activo: true });
 
     // Calcular el total de páginas
     const totalPaginas = Math.ceil(totalProductos / limit);
@@ -55,10 +57,14 @@ const getProductoByIDController = async (req, res) => {
   }
 
   try {
-    const producto = await Producto.findById(id).populate('id_categoria');
+    const producto = await Producto.findById(id).populate('id_categoria').populate('ingredientes');
 
     if (!producto) {
       return res.status(404).json({ msg: "Producto no encontrado" });
+    }
+
+    if (!producto.activo) {
+      return res.status(404).json({ msg: "Producto no disponible" });
     }
 
     return res.status(200).json({ producto });
@@ -88,18 +94,26 @@ const createProductoController = async (req, res) => {
   tipo = tipo?.trim();
 
   beneficios = !beneficios ? [] : typeof beneficios === "string" ? [beneficios] : beneficios;
-  let parsedIngredientes = !ingredientes ? [] : typeof ingredientes === "string" ? [ingredientes] : ingredientes;
+  const ingredientesEnBD = await Ingrediente.find({ _id: { $in: ingredientes } });
+
+  if (ingredientesEnBD.length !== ingredientes.length) {
+    throw new Error('Uno o más ingredientes no existen en la base de datos.');
+  }
 
   if (!nombre || !descripcion || !precio || !stock || !id_categoria || !aroma || !tipo || !req.file) {
     return res.status(400).json({ msg: "Todos los campos y la imagen son obligatorios" });
   }
 
-  if (parsedIngredientes.length < 2) {
-    return res.status(400).json({ msg: "Debes seleccionar al menos 2 ingredientes" });
-  }
-
   if (isNaN(precio) || precio <= 0) {
     return res.status(400).json({ msg: "El precio debe ser un número positivo" });
+  }
+
+  if (isNaN(stock) || stock < 0) {
+    return res.status(400).json({ msg: "El stock debe ser un número mayor o igual a cero" });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(id_categoria)) {
+    return res.status(400).json({ msg: "ID de categoría no válido" });
   }
 
   try {
@@ -113,7 +127,7 @@ const createProductoController = async (req, res) => {
       nombre,
       descripcion,
       beneficios,
-      ingredientes: parsedIngredientes,
+      ingredientes,
       aroma,
       tipo,
       precio,
@@ -137,7 +151,7 @@ const createProductoController = async (req, res) => {
 // Actualizar un producto
 const updateProductoController = async (req, res) => {
   const { id } = req.params;
-  const {
+  let {
     nombre,
     descripcion,
     precio,
@@ -153,66 +167,89 @@ const updateProductoController = async (req, res) => {
     return res.status(400).json({ msg: "ID de producto no válido" });
   }
 
+  // Parsear ingredientes si vienen como string en form-data
+  if (typeof ingredientes === 'string') {
+    try {
+      ingredientes = JSON.parse(ingredientes);
+    } catch {
+      ingredientes = ingredientes.split(',').map(i => i.trim());
+    }
+  }
+
+  // Parsear beneficios si vienen como string en form-data
+  if (typeof beneficios === 'string') {
+    try {
+      beneficios = JSON.parse(beneficios);
+    } catch {
+      beneficios = beneficios.split(',').map(b => b.trim());
+    }
+  }
+
+  // Validaciones básicas
+  if (precio && (isNaN(precio) || precio <= 0)) {
+    return res.status(400).json({ msg: "El precio debe ser un número positivo" });
+  }
+
+  if (cantidad && (isNaN(cantidad) || cantidad < 0)) {
+    return res.status(400).json({ msg: "El stock debe ser un número positivo o 0" });
+  }
+
+  // Validar ingredientes si vienen
+  if (ingredientes && Array.isArray(ingredientes)) {
+    const ingredientesEnBD = await Ingrediente.find({ _id: { $in: ingredientes } });
+
+    if (ingredientesEnBD.length !== ingredientes.length) {
+      return res.status(400).json({ msg: "Uno o más ingredientes no existen en la base de datos" });
+    }
+  }
+
   try {
     const producto = await Producto.findById(id);
     if (!producto) {
       return res.status(404).json({ msg: "Producto no encontrado" });
     }
 
-    if (precio && (isNaN(precio) || precio <= 0)) {
-      return res.status(400).json({ msg: "El precio debe ser un número positivo" });
+    if (!producto.activo) {
+      return res.status(400).json({ msg: "El producto está desactivado" });
     }
 
-    if (cantidad && (isNaN(cantidad) || cantidad < 0)) {
-      return res.status(400).json({ msg: "El stock debe ser un número positivo o 0" });
-    }
-
-    let parsedBeneficios = [];
-    if (beneficios) {
-      parsedBeneficios = typeof beneficios === "string"
-        ? [beneficios]
-        : Array.isArray(beneficios) ? beneficios : [];
-    }
-
-    let parsedIngredientes = [];
-    if (ingredientes) {
-      parsedIngredientes = typeof ingredientes === "string"
-        ? [ingredientes]
-        : Array.isArray(ingredientes) ? ingredientes : [];
-    }
-
+    // Reemplazo de imagen si llega una nueva
     if (req.file) {
       if (producto.imagen_id) {
         try {
           await cloudinary.uploader.destroy(producto.imagen_id);
         } catch (error) {
-          console.warn("No se pudo eliminar la imagen en Cloudinary:", error.message);
+          console.warn("No se pudo eliminar la imagen previa:", error.message);
         }
       }
-
-      producto.imagen = req.file.path;
-      producto.imagen_id = req.file.filename;
     }
 
-    producto.nombre = nombre ? nombre.trim() : producto.nombre;
-    producto.descripcion = descripcion ? descripcion.trim() : producto.descripcion;
-    producto.precio = precio || producto.precio;
-    producto.stock = cantidad !== undefined ? cantidad : producto.stock;
-    producto.id_categoria = categoria || producto.id_categoria;
-    producto.aroma = aroma ? aroma.trim() : producto.aroma;
-    producto.tipo = tipo ? tipo.trim() : producto.tipo;
+    // Preparar campos a actualizar
+    const camposActualizados = {
+      nombre: nombre?.trim() || producto.nombre,
+      descripcion: descripcion?.trim() || producto.descripcion,
+      precio: precio || producto.precio,
+      stock: cantidad !== undefined ? cantidad : producto.stock,
+      id_categoria: categoria || producto.id_categoria,
+      aroma: aroma?.trim() || producto.aroma,
+      tipo: tipo?.trim() || producto.tipo,
+      beneficios: Array.isArray(beneficios) && beneficios.length > 0 ? beneficios : producto.beneficios,
+      ingredientes: Array.isArray(ingredientes) && ingredientes.length > 0 ? ingredientes : producto.ingredientes,
+    };
 
-    if (parsedBeneficios.length > 0) {
-      producto.beneficios = parsedBeneficios;
+    if (req.file) {
+      camposActualizados.imagen = req.file.path;
+      camposActualizados.imagen_id = req.file.filename;
     }
 
-    if (parsedIngredientes.length > 0) {
-      producto.ingredientes = parsedIngredientes;
-    }
+    const productoActualizado = await Producto.findByIdAndUpdate(
+      id,
+      { $set: camposActualizados },
+      { new: true, runValidators: true }
+    );
 
-    await producto.save();
+    return res.status(200).json({ msg: "Producto actualizado exitosamente", producto: productoActualizado });
 
-    return res.status(200).json({ msg: "Producto actualizado exitosamente", producto });
   } catch (error) {
     console.error("Error al actualizar producto:", error);
     return res.status(500).json({ msg: "Error al actualizar el producto", error: error.message });
@@ -235,23 +272,49 @@ const deleteProductoController = async (req, res) => {
       return res.status(404).json({ msg: "Producto no encontrado" });
     }
 
-    // Eliminar imagen en Cloudinary si existe
-    if (producto.imagen_id) {
-      try {
-        await cloudinary.uploader.destroy(producto.imagen_id);
-      } catch (error) {
-        console.warn("No se pudo eliminar la imagen en Cloudinary:", error.message);
-      }
+    if (!producto.activo) {
+      return res.status(400).json({ msg: "El producto ya está desactivado" });
     }
 
-    await producto.deleteOne();
+    // Desactivar el producto (borrado lógico)
+    const productoDesactivado = await Producto.findByIdAndUpdate(id, { activo: false }, { new: true });
 
-    return res.status(200).json({ msg: `Producto eliminado con éxito`, producto });
+    return res.status(200).json({ msg: "Producto desactivado con éxito", productoDesactivado });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ msg: "Error al eliminar el producto", error });
+    console.error("Error al desactivar el producto:", error);
+    return res.status(500).json({ msg: "Error al desactivar el producto", error: error.message });
   }
 };
+
+const reactivarProductoController = async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ msg: "ID de producto no válido" });
+  }
+
+  try {
+    const producto = await Producto.findById(id);
+
+    if (!producto) {
+      return res.status(404).json({ msg: "Producto no encontrado" });
+    }
+
+    if (producto.activo) {
+      return res.status(400).json({ msg: "El producto ya está activo" });
+    }
+
+    producto.activo = true;
+    await producto.save();
+
+    return res.status(200).json({ msg: "Producto reactivado exitosamente", producto });
+  } catch (error) {
+    console.error("Error al reactivar el producto:", error);
+    return res.status(500).json({ msg: "Error al reactivar el producto", error: error.message });
+  }
+};
+
+
 
 export {
   createProductoController,
@@ -259,4 +322,5 @@ export {
   getProductoByIDController,
   updateProductoController,
   deleteProductoController,
+  reactivarProductoController,
 };

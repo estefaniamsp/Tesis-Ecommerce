@@ -17,14 +17,13 @@ const productoSchema = new Schema(
       type: [String],
       validate: [array => array.length <= 3, "Máximo 3 beneficios"],
     },
-    ingredientes: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Ingredientes",
-      validate: {
-        validator: arr => arr.length >= 2,
-        message: "Debes seleccionar al menos 2 ingredientes",
-      },
-    },
+    ingredientes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Ingredientes",
+        required: true
+      }
+    ],
     aroma: {
       type: String, // ej: "Vainilla"
       required: true,
@@ -61,6 +60,10 @@ const productoSchema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Categorias",  // Referencia a la colección de categorías
       required: true,  // Cada producto debe pertenecer a una categoría
+    },
+    activo: {
+      type: Boolean,
+      default: true,
     },
   },
   { timestamps: true }

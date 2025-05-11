@@ -96,6 +96,10 @@ const createCarritoController = async (req, res) => {
                 return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
             }
 
+            if (!producto.activo) {
+                return res.status(400).json({ msg: `El producto ${producto.nombre} está descontinuado y no puede ser añadido al carrito.` });
+            }
+
             const subtotal = producto.precio * cantidad;
             totalCarrito += subtotal;
 
@@ -191,6 +195,10 @@ const updateCarritoController = async (req, res) => {
             const producto = await Producto.findById(producto_id.trim());
             if (!producto) {
                 return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
+            }
+
+            if (!producto.activo) {
+                return res.status(400).json({ msg: `El producto ${producto.nombre} está descontinuado y no puede ser añadido al carrito.` });
             }
 
             if (producto.stock < cantidad) {
