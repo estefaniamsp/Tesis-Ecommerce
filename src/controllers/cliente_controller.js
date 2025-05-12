@@ -615,17 +615,17 @@ const desactiveClienteAdmin = async (req, res) => {
 
   try {
     const cliente = await Clientes.findById(id);
-    if (!cliente) return res.status(404).json({ msg: "Cliente no encontrado" });
-    cliente.estado = 'inactivo';
+    if (!cliente) {
+      return res.status(404).json({ msg: "Cliente no encontrado" });
+    }
 
     if (cliente.estado === 'inactivo') {
       return res.status(400).json({ msg: "El cliente ya está inactivo" });
     }
 
-    await cliente.save();
+    await Clientes.findByIdAndUpdate(id, { estado: 'inactivo' });
 
     res.status(200).json({ msg: "Estado del cliente actualizado a inactivo exitosamente" });
-
 
   } catch (error) {
     res.status(500).json({ msg: "Error al actualizar el estado del cliente", error: error.message });
@@ -637,14 +637,15 @@ const activeClienteAdmin = async (req, res) => {
 
   try {
     const cliente = await Clientes.findById(id);
-    if (!cliente) return res.status(404).json({ msg: "Cliente no encontrado" });
+    if (!cliente) {
+      return res.status(404).json({ msg: "Cliente no encontrado" });
+    }
 
     if (cliente.estado === 'activo') {
       return res.status(400).json({ msg: "El cliente ya está activo" });
     }
 
-    cliente.estado = 'activo';
-    await cliente.save();
+    await Clientes.findByIdAndUpdate(id, { estado: 'activo' });
 
     res.status(200).json({ msg: "Estado del cliente actualizado a activo exitosamente" });
   } catch (error) {
