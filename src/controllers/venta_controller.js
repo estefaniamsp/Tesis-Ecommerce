@@ -368,7 +368,6 @@ const getFacturaClienteById = async (req, res) => {
 
   try {
     const venta = await Ventas.findById(id)
-      .populate("productos.producto_id", "nombre descripcion precio")
       .populate("cliente_id", "nombre apellido email");
 
     if (!venta) {
@@ -389,9 +388,7 @@ const getFacturaClienteById = async (req, res) => {
         email: venta.cliente_id.email
       },
       productos: venta.productos.map(p => ({
-        nombre: p.producto_id.nombre,
-        descripcion: p.producto_id.descripcion,
-        precio_unitario: p.producto_id.precio,
+        producto_id: p.producto_id,
         cantidad: p.cantidad,
         subtotal: p.subtotal
       })),

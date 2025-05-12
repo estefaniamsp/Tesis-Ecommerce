@@ -5,16 +5,21 @@ import cloudinary from "../config/cloudinary.js";
 // Obtener todos los ingredientes
 const getAllIngredientesController = async (req, res) => {
     try {
-        // Extraer y convertir los parámetros de consulta
         let page = parseInt(req.query.page, 10) || 1;
         let limit = parseInt(req.query.limit, 10) || 10;
+        const { id_categoria } = req.query;
 
-        // Validar que 'page' y 'limit' sean números enteros positivos
         if (page < 1) page = 1;
         if (limit < 1) limit = 10;
 
         const skip = (page - 1) * limit;
-        const ingredientes = await Ingrediente.find().populate("id_categoria")
+
+        // Crear filtro dinámico
+        const filtro = {};
+        if (id_categoria) filtro.id_categoria = id_categoria;
+
+        const ingredientes = await Ingrediente.find(filtro)
+            .populate("id_categoria")
             .skip(skip)
             .limit(limit);
 
