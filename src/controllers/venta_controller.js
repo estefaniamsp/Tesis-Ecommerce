@@ -257,47 +257,57 @@ const updateVentaController = async (req, res) => {
   const { id } = req.params;
   const { estado } = req.body;
 
-  // Verificar si el ID es válido
+  // Validar ID
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(404).json({ msg: "Lo sentimos, la venta no existe" });
   }
 
-  // Verificar si el estado es válido
+  // Validar estado
   if (!["pendiente", "finalizado"].includes(estado)) {
     return res.status(400).json({ msg: "Estado inválido" });
   }
 
   try {
-    // Actualizar la venta
+    // Actualizar venta
     const ventaActualizada = await Ventas.findByIdAndUpdate(
       id,
       { estado },
       { new: true }
-    )
-      .populate("cliente_id", "nombre apellido email")
-      .populate("productos.producto_id", "nombre descripcion precio");
+    ).populate("cliente_id", "nombre apellido email");
 
     if (!ventaActualizada) {
       return res.status(404).json({ msg: "Venta no encontrada" });
     }
 
-    // Formatear respuesta de manera más concisa
+    // Convertir todo el documento a objeto plano primero
+    const ventaObj = ventaActualizada.toObject();
+
+    // Formatear productos
+    const productosFormateados = ventaObj.productos.map(p => ({
+      ...p,
+      producto: p.producto_id,
+      producto_id: undefined // opcional: eliminar el campo original
+    }));
+
     const ventaFormateada = {
-      ...ventaActualizada.toObject(),
-      cliente: ventaActualizada.cliente_id,
-      productos: ventaActualizada.productos.map(({ producto_id, ...resto }) => ({
-        ...resto,
-        producto: producto_id
-      }))
+      ...ventaObj,
+      productos: productosFormateados
     };
 
-    res.status(200).json({ msg: "Venta actualizada con éxito", venta: ventaFormateada });
+    res.status(200).json({
+      msg: "Venta actualizada con éxito",
+      venta: ventaFormateada
+    });
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ msg: "Error al actualizar la venta", error: error.message });
+    res.status(500).json({
+      msg: "Error al actualizar la venta",
+      error: error.message
+    });
   }
 };
+
 
 // Eliminar una venta
 const deleteVentaController = async (req, res) => {
