@@ -4,38 +4,36 @@ import Producto from "../models/productos.js";
 import mongoose from "mongoose";
 
 // Obtener todos los carritos
-// Obtener todos los carritos
 const getAllCarritosController = async (req, res) => {
     try {
-        // Extraer y convertir los parámetros de consulta
+        const clienteId = req.clienteBDD._id;
+
+        // Paginación
         let page = parseInt(req.query.page, 10) || 1;
         let limit = parseInt(req.query.limit, 10) || 10;
 
-        // Validar que 'page' y 'limit' sean números enteros positivos
         if (page < 1) page = 1;
         if (limit < 1) limit = 10;
 
         const skip = (page - 1) * limit;
 
-        // Obtener los carritos con paginación y población de referencias
-        const carritos = await Carritos.find()
-            .populate({ path: 'cliente_id', select: '-password' }) // Excluir el campo 'password'
-            .populate('productos.producto_id') // Población de la referencia a los productos
+        // Buscar solo los carritos de ese cliente
+        const carritos = await Carritos.find({ cliente_id: clienteId })
+            .populate({
+                path: 'cliente_id',
+                select: '-password -codigoRecuperacionExpires -codigoRecuperacion -token -confirmEmail -createdAt -updatedAt -__v'
+            })
             .skip(skip)
-            .limit(limit);
+            .limit(limit)
+            .sort({ createdAt: -1 }); // opcional: carritos más recientes primero
 
-        // Contar el total de carritos
-        const totalCarritos = await Carritos.countDocuments();
-
-        // Calcular el total de páginas
+        const totalCarritos = await Carritos.countDocuments({ cliente_id: clienteId });
         const totalPaginas = Math.ceil(totalCarritos / limit);
 
-        // Verificar si se encontraron carritos
         if (carritos.length === 0) {
-            return res.status(404).json({ msg: "No se encontraron carritos" });
+            return res.status(404).json({ msg: "No se encontraron carritos asociados a tu cuenta" });
         }
 
-        // Responder con los carritos y la información de paginación
         return res.status(200).json({
             totalCarritos,
             totalPaginas,
@@ -51,14 +49,30 @@ const getAllCarritosController = async (req, res) => {
 // Obtener un carrito por ID
 const getCarritoByIDController = async (req, res) => {
     const { id } = req.params;
+    const usuario = req.clienteBDD;
+
     try {
+        // Buscar el carrito
         const carrito = await Carritos.findById(id)
-            .populate({ path: 'cliente_id', select: '-password' }) // Excluir el campo 'password'
+
             .populate('productos.producto_id');
-        const status = carrito ? 200 : 404;
-        res.status(status).json(carrito || { msg: "Carrito no encontrado" });
+
+        // Si no existe el carrito
+        if (!carrito) {
+            return res.status(404).json({ msg: "Carrito no encontrado" });
+        }
+
+        // Verificar si el carrito pertenece al cliente logueado
+        if (carrito.cliente_id._id.toString() !== usuario._id.toString()) {
+            return res.status(403).json({ msg: "No tienes permiso para ver este carrito" });
+        }
+
+        // Devolver el carrito si todo está bien
+        res.status(200).json(carrito);
+
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error("Error al obtener carrito por ID:", error);
+        res.status(500).json({ msg: "Error al obtener el carrito", error: error.message });
     }
 };
 

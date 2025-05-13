@@ -11,8 +11,8 @@ import { validarCarrito, manejarErrores } from '../middlewares/validacionForms.j
 
 const router = Router();
 
-router.get('/carritos', getAllCarritosController);
-router.get('/carritos/:id', getCarritoByIDController);
+router.get('/carritos', verificarAutenticacion, getAllCarritosController);
+router.get('/carritos/:id', verificarAutenticacion, getCarritoByIDController);
 router.post('/carritos', verificarAutenticacion, validarCarrito, manejarErrores, createCarritoController);
 router.put('/carritos/:id', verificarAutenticacion, updateCarritoController);
 router.delete('/carritos/:id', verificarAutenticacion, deleteCarritoController);
