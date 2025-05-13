@@ -257,14 +257,14 @@ const updateVentaController = async (req, res) => {
   const { id } = req.params;
   const { estado } = req.body;
 
-  // Verificar si el estado es válido
-  if (!["pendiente", "completada", "cancelada"].includes(estado)) {
-    return res.status(400).json({ msg: "Estado inválido" });
-  }
-
   // Verificar si el ID es válido
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(404).json({ msg: "Lo sentimos, la venta no existe" });
+  }
+
+  // Verificar si el estado es válido
+  if (!["pendiente", "finalizado"].includes(estado)) {
+    return res.status(400).json({ msg: "Estado inválido" });
   }
 
   try {
@@ -281,20 +281,21 @@ const updateVentaController = async (req, res) => {
       return res.status(404).json({ msg: "Venta no encontrada" });
     }
 
-    // Formatear respuesta
+    // Formatear respuesta de manera más concisa
     const ventaFormateada = {
-      ...ventaActualizada._doc,
+      ...ventaActualizada.toObject(),
       cliente: ventaActualizada.cliente_id,
-      productos: ventaActualizada.productos.map(p => ({
-        ...p._doc,
-        producto: p.producto_id
+      productos: ventaActualizada.productos.map(({ producto_id, ...resto }) => ({
+        ...resto,
+        producto: producto_id
       }))
     };
 
     res.status(200).json({ msg: "Venta actualizada con éxito", venta: ventaFormateada });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ msg: "Error al actualizar la venta", error: error.message });
   }
 };
 
