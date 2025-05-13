@@ -19,7 +19,6 @@ const getAllVentasController = async (req, res) => {
     // Obtener las ventas con paginación y población de referencias
     const ventas = await Ventas.find()
       .populate("cliente_id", "nombre apellido email")
-      .populate("productos.producto_id", "nombre descripcion precio")
       .skip(skip)
       .limit(limit);
 
@@ -53,7 +52,6 @@ const getVentaByIDController = async (req, res) => {
   try {
     const venta = await Ventas.findById(id)
       .populate("cliente_id", "nombre apellido email")
-      .populate("productos.producto_id", "nombre descripcion precio");
 
     if (!venta) {
       return res.status(404).json({ msg: "Venta no encontrada" });
