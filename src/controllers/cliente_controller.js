@@ -1,10 +1,10 @@
 import Clientes from "../models/clientes.js";
 import Admin from "../models/administrador.js";
-import generarJWT from "../T_helpers/crearJWT.js";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 import mongoose from "mongoose";
 import { sendMailToUser } from "../config/nodemailer.js";
+import { generarJWT, generarJWTSinCaducidad } from "../T_helpers/crearJWT.js";
 import cloudinary from "../config/cloudinary.js";
 
 // Registrar cliente
@@ -126,10 +126,14 @@ const confirmEmail = async (req, res) => {
 // Iniciar sesión
 const loginCliente = async (req, res) => {
   let { email, password } = req.body;
+  let { environment } = req.query;
+  const WEB = "web";
+  const MOBILE = "mobile";
 
   // Limpiar espacios al inicio y final
   email = email ? email.trim() : "";
   password = password ? password.trim() : "";
+  environment = environment ? environment : WEB;
 
   // Validaciones básicas
   if (!email && !password) {
@@ -169,7 +173,15 @@ const loginCliente = async (req, res) => {
       return res.status(401).json({ msg: "Correo o contraseña incorrectos" });
     }
 
-    const token = generarJWT(ClienteBDD._id, ClienteBDD.nombre);
+    let token;
+    if (environment === WEB) {
+      token = generarJWT(ClienteBDD._id, ClienteBDD.nombre)
+    }else if (environment === MOBILE) {
+      token = generarJWTSinCaducidad(ClienteBDD._id, ClienteBDD.nombre);
+    } else {
+      return res.status(400).json({ msg: "Entorno no válido" });
+    }
+
     const { nombre, apellido, genero, _id } = ClienteBDD;
 
     res.status(200).json({
@@ -393,7 +405,8 @@ const recuperarContrasenia = async (req, res) => {
 
 // Cambiar contraseña
 const cambiarContrasenia = async (req, res) => {
-  let { email, nuevaPassword, codigoRecuperacion } = req.body;
+  let { email, nuevaPassword } = req.body;
+  let { codigoRecuperacion } = req.query; 
 
   // Limpiar
   email = email?.trim().toLowerCase();

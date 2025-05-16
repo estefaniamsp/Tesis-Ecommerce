@@ -4,5 +4,14 @@ const generarJWT = (id,nombre)=>{
     return jwt.sign({id,nombre},process.env.JWT_SECRET,{expiresIn:"1d"})
 }
 
-export default  generarJWT
+const generarJWTSinCaducidad = (id, nombre) => {
+  return jwt.sign({ id, nombre }, process.env.JWT_SECRET);
+};
+
+export {
+    generarJWT,
+    generarJWTSinCaducidad
+}
+
+
 

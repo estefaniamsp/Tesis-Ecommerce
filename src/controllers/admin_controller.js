@@ -78,9 +78,13 @@ const confirmEmail = async (req, res) => {
 // Iniciar sesión de administrador
 const loginAdmin = async (req, res) => {
     let { email, password } = req.body;
+    let { environment } = req.query;
+    const WEB = "web";
+    const MOBILE = "mobile";
 
     email = email.trim();
     password = password.trim();
+    environment = environment ? environment : WEB;
 
     if (!email && !password) {
         return res.status(400).json({ msg: "Debes ingresar el email y la contraseña" });
@@ -111,7 +115,14 @@ const loginAdmin = async (req, res) => {
         }
 
         // Generar el token para la sesión del admin
-        const token = jwt.sign({ id: admin._id, rol: "admin" }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        let token;
+        if (environment === WEB) {
+            token = jwt.sign({ id: admin._id, rol: "admin" }, process.env.JWT_SECRET, { expiresIn: "1h" })
+        }else if (environment === MOBILE) {
+            token = jwt.sign({ id: admin._id, rol: "admin" }, process.env.JWT_SECRET)
+        }else {
+            return res.status(400).json({ msg: "Entorno no válido" });
+        }
 
         res.json({ msg: "Inicio de sesión exitoso", token });
     } catch (error) {
@@ -184,12 +195,13 @@ const recuperarContraseniaController = async (req, res) => {
 
 // Cambiar contraseña
 const cambiarContraseniaController = async (req, res) => {
-    let { email, nuevaPassword, codigoRecuperacion } = req.body;
+    let { email, nuevaPassword } = req.body;
+    let { codigoRecuperacion } = req.query; 
 
     // Limpiar espacios innecesarios
     email = email.trim().toLowerCase();
     nuevaPassword = nuevaPassword.trim();
-    codigoRecuperacion = codigoRecuperacion.trim();
+    codigoRecuperacion = (codigoRecuperacion || "").trim(); // Evitar error si viene undefined
 
     // Validaciones básicas
     if (!email || !nuevaPassword || !codigoRecuperacion) {
@@ -211,6 +223,7 @@ const cambiarContraseniaController = async (req, res) => {
         ) {
             return res.status(400).json({ msg: "Código de recuperación inválido o expirado" });
         }
+
         // Actualizar contraseña
         const salt = await bcrypt.genSalt(10);
         admin.password = await bcrypt.hash(nuevaPassword, salt);
