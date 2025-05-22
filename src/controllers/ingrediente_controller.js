@@ -60,17 +60,18 @@ const getIngredienteByIDController = async (req, res) => {
 
 // Crear un nuevo ingrediente
 const createIngredienteController = async (req, res) => {
-    let { nombre, stock, id_categoria, precio } = req.body;
+    let { nombre, stock, id_categoria, precio, tipo } = req.body;
 
-    if (!nombre || !stock || !id_categoria || !precio || !req.file) {
+    if (!nombre || !stock || !id_categoria || !precio || tipo || !req.file) {
         return res.status(400).json({
-            msg: "El nombre, el stock, la categoría, el precio y la imagen son obligatorios"
+            msg: "Todos los campos son obligatorios"
         });
     }
 
     nombre = nombre.trim();
     stock = parseInt(stock.trim());
     precio = parseFloat(precio.trim());
+    tipo = tipo.trim();
 
     try {
         // Verificar si ya existe un ingrediente con ese nombre
@@ -89,6 +90,7 @@ const createIngredienteController = async (req, res) => {
             stock,
             id_categoria,
             precio,
+            tipo,
             imagen: req.file.path, // ya es secure_url
             imagen_id: req.file.filename, // es el public_id
         });
@@ -122,7 +124,7 @@ const createIngredienteController = async (req, res) => {
 // Actualizar un ingrediente existente
 const updateIngredienteController = async (req, res) => {
     const { id } = req.params;
-    const { nombre, stock, id_categoria, precio } = req.body;
+    const { nombre, stock, id_categoria, precio, tipo } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ msg: "ID no válido" });
@@ -153,6 +155,7 @@ const updateIngredienteController = async (req, res) => {
         // Actualizar nombre, stock, categoria y precio si vienen
         if (nombre) ingrediente.nombre = nombre.trim();
         if (stock) ingrediente.stock = parseInt(stock.trim());
+        if (tipo) ingrediente.tipo = tipo.trim();
         if (id_categoria) ingrediente.id_categoria = id_categoria.trim();
         if (precio) ingrediente.precio = parseFloat(precio.trim());
 

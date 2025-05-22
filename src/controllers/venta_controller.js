@@ -113,7 +113,7 @@ const createVentaCliente = async (req, res) => {
       }
 
       if (!producto.activo) {
-        return res.status(400).jason({msg: `El producto ${producto.nombre} está descontinuado y no puede ser añadido.`});
+        return res.status(400).jason({ msg: `El producto ${producto.nombre} está descontinuado y no puede ser añadido.` });
       }
 
       // Verificar stock suficiente
@@ -398,6 +398,9 @@ const getFacturaClienteById = async (req, res) => {
       },
       productos: venta.productos.map(p => ({
         producto_id: p.producto_id,
+        nombre: p.producto_id.nombre,
+        imagen: p.producto_id.imagen,
+        precio: p.producto_id.precio,
         cantidad: p.cantidad,
         subtotal: p.subtotal
       })),
@@ -413,6 +416,62 @@ const getFacturaClienteById = async (req, res) => {
   }
 };
 
+// Obtener estadísticas generales
+const getDashboardController = async (req, res) => {
+  try {
+    const { scope } = req.query;
+
+    const hoy = new Date();
+    const inicioSemana = new Date(hoy);
+    inicioSemana.setDate(hoy.getDate() - hoy.getDay() + 1); // lunes
+
+    const resultados = {};
+
+    if (!scope || scope.includes("clientes")) {
+      resultados.numeroClientes = await Clientes.countDocuments();
+    }
+
+    if (!scope || scope.includes("productos")) {
+      resultados.numeroProductos = await Producto.countDocuments();
+    }
+
+    if (!scope || scope.includes("ventas")) {
+      resultados.numeroVentas = await Ventas.countDocuments();
+    }
+
+    if (!scope || scope.includes("ventas_semanales")) {
+      resultados.numeroVentasSemanales = await Ventas.countDocuments({
+        fecha_venta: { $gte: inicioSemana }
+      });
+    }
+
+    if (!scope || scope.includes("ventas_jabones") || scope.includes("ventas_velas")) {
+      const ventas = await Ventas.find().populate("productos.producto_id");
+
+      let jabones = 0;
+      let velas = 0;
+
+      for (const venta of ventas) {
+        for (const p of venta.productos) {
+          const tipo = p.producto_id?.tipo?.toLowerCase();
+          if (tipo === "jabón" || tipo === "jabon") jabones += 1;
+          if (tipo === "vela") velas += 1;
+        }
+      }
+
+      if (scope?.includes("ventas_jabones") || !scope) resultados.ventasJabones = jabones;
+      if (scope?.includes("ventas_velas") || !scope) resultados.ventasVelas = velas;
+    }
+
+    return res.status(200).json(resultados);
+
+  } catch (error) {
+    console.error("Error al obtener estadísticas:", error);
+    return res.status(500).json({ msg: "Error al obtener estadísticas", error: error.message });
+  }
+};
+
+
 
 export {
   getAllVentasController,
@@ -422,5 +481,6 @@ export {
   updateVentaController,
   deleteVentaController,
   getVentasClienteController,
-  getFacturaClienteById
+  getFacturaClienteById,
+  getDashboardController
 };

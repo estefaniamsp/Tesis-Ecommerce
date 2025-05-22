@@ -13,7 +13,7 @@ const ingredienteSchema = new Schema(
             required: true,
         },
         imagen_id: {
-            type: String, 
+            type: String,
             required: true,
         },
         stock: {
@@ -23,17 +23,29 @@ const ingredienteSchema = new Schema(
         },
         id_categoria: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: "Categorias",  
-            required: true,  
+            ref: "Categorias",
+            required: true,
         },
         precio: {
             type: Number,
             required: true,
             min: 0,
         },
+        tipo: {
+            type: String,
+            required: true,
+        },
     },
     {
         timestamps: true,
+        toJSON: {
+            transform(doc, ret) {
+                delete ret.__v;
+                delete ret.createdAt;
+                delete ret.updatedAt;
+                delete ret.imagen_id; 
+            },
+        },
     }
 );
 

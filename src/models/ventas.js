@@ -4,13 +4,13 @@ const ventaSchema = new mongoose.Schema(
     {
         cliente_id: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'Clientes', 
+            ref: 'Clientes',
             required: true,
         },
         productos: [{
             producto_id: {
                 type: mongoose.Schema.Types.ObjectId,
-                ref: 'Productos', 
+                ref: 'Productos',
                 required: true,
             },
             cantidad: {
@@ -37,7 +37,18 @@ const ventaSchema = new mongoose.Schema(
             default: 'pendiente',
         }
     },
-    { timestamps: true }
+    {
+        timestamps: true,
+        toJSON: {
+            transform(doc, ret) {
+                delete ret.__v;
+                delete ret.createdAt;
+                delete ret.updatedAt;
+                delete ret.imagen_id; 
+            },
+        },
+
+    }
 );
 
 const Venta = mongoose.model('Ventas', ventaSchema);

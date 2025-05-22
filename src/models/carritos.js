@@ -40,11 +40,22 @@ const carritoSchema = new mongoose.Schema({
         type: String,
         enum: ['pendiente', 'finalizado'],
         default: 'pendiente'
+    },
+},
+    {
+        timestamps: true,
+        toJSON: {
+            transform(doc, ret) {
+                delete ret.__v;
+                delete ret.createdAt;
+                delete ret.updatedAt;
+            },
+        },
     }
-});
+);
 
 // Método para calcular el total del carrito y los subtotales de cada producto
-carritoSchema.methods.calcularTotal = function() {
+carritoSchema.methods.calcularTotal = function () {
     let total = 0;
     this.productos.forEach(item => {
         item.subtotal = item.precio_unitario * item.cantidad;
@@ -54,7 +65,7 @@ carritoSchema.methods.calcularTotal = function() {
 };
 
 // Pre-save hook para recalcular el total antes de guardar el carrito
-carritoSchema.pre('save', function(next) {
+carritoSchema.pre('save', function (next) {
     this.calcularTotal();
     next();
 });

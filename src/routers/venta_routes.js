@@ -7,7 +7,8 @@ import {
     updateVentaController,
     deleteVentaController,
     getVentasClienteController,
-    getFacturaClienteById
+    getFacturaClienteById,
+    getDashboardController
 } from '../controllers/venta_controller.js'; 
 import verificarAuthAdmin from '../middlewares/admin_auth.js'; 
 import { validarVenta, manejarErrores } from '../middlewares/validacionForms.js';
@@ -26,8 +27,6 @@ router.get('/ventas/:id', verificarAuthAdmin, getVentaByIDController);
 router.post('/ventas/admin', verificarAuthAdmin, validarVenta, manejarErrores, createVentaAdmin);
 router.put('/ventas/:id', verificarAuthAdmin, updateVentaController);
 router.delete('/ventas/:id', verificarAuthAdmin, deleteVentaController);
-
-
-
+router.get('/ventas/dashboard/stats', verificarAuthAdmin, getDashboardController);
 
 export default router;

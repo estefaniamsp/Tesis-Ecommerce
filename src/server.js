@@ -13,6 +13,7 @@ import routerCarrito from './routers/carrito_routes.js'
 import routerPromocion from './routers/promocion_routes.js'
 import routerAuth from './routers/auth_routes.js'
 import routerIngrediente from './routers/ingrediente_routes.js'
+import routerProductoPersonalizado from './routers/productoPersonalizado_routes.js'
 import { createAdmin } from './controllers/admin_controller.js';
 
 const app = express()
@@ -39,6 +40,7 @@ app.use('/api',routerVenta)
 app.use('/api',routerCarrito)
 app.use('/api',routerPromocion)
 app.use('/api',routerIngrediente)
+app.use('/api',routerProductoPersonalizado)
 app.use('/api',routerAuth)
 
 // Rutas 

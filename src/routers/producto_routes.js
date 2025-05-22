@@ -5,10 +5,12 @@ import {
     createProductoController, 
     updateProductoController, 
     deleteProductoController,
-    reactivarProductoController
+    reactivarProductoController,
+    personalizarProductoIAController
 } from '../controllers/producto_controller.js';
 import upload from '../config/multer.js';
 import verificarAuthAdmin from '../middlewares/admin_auth.js';
+import verificarAutenticacion from '../middlewares/auth.js';
 import { validarProducto, manejarErrores } from '../middlewares/validacionForms.js';
 
 const router = Router();
@@ -23,5 +25,6 @@ router.put('/productos/:id', verificarAuthAdmin,(req, res, next) => {req.folderN
 }, upload.single("imagen"), updateProductoController);
 router.delete('/productos/:id', verificarAuthAdmin, deleteProductoController);
 router.patch('/productos/:id', verificarAuthAdmin, reactivarProductoController);
+router.post('/productos/recomendacion', verificarAutenticacion, personalizarProductoIAController);
 
 export default router;
