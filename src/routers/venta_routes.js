@@ -3,7 +3,6 @@ import {
     getAllVentasController, 
     getVentaByIDController, 
     createVentaCliente, 
-    createVentaAdmin, 
     updateVentaController,
     deleteVentaController,
     getVentasClienteController,
@@ -24,7 +23,6 @@ router.get('/ventas/cliente/factura/:id', verificarAutenticacion, getFacturaClie
 // Rutas para el administrador 
 router.get('/ventas', verificarAuthAdmin, getAllVentasController);
 router.get('/ventas/:id', verificarAuthAdmin, getVentaByIDController);
-router.post('/ventas/admin', verificarAuthAdmin, validarVenta, manejarErrores, createVentaAdmin);
 router.put('/ventas/:id', verificarAuthAdmin, updateVentaController);
 router.delete('/ventas/:id', verificarAuthAdmin, deleteVentaController);
 router.get('/ventas/dashboard/stats', verificarAuthAdmin, getDashboardController);

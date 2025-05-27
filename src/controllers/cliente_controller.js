@@ -1,5 +1,6 @@
 import Clientes from "../models/clientes.js";
 import Admin from "../models/administrador.js";
+import Carrito from "../models/carritos.js";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 import mongoose from "mongoose";
@@ -48,6 +49,16 @@ const registerCliente = async (req, res) => {
 
     // Guardar el cliente
     await nuevoCliente.save();
+
+    // Crear un carrito vacío al registrar el cliente
+    const nuevoCarrito = new Carrito({
+      cliente_id: nuevoCliente._id,
+      productos: [],
+      total: 0,
+      estado: "pendiente",
+    });
+
+    await nuevoCarrito.save();
 
     // Generar y asignar token
     const token = nuevoCliente.crearToken();
@@ -164,7 +175,7 @@ const loginCliente = async (req, res) => {
     }
 
     if (!ClienteBDD.confirmEmail) {
-      return res.status(401).json({ msg: "Debes confirmar tu correo electrónico" });  
+      return res.status(401).json({ msg: "Debes confirmar tu correo electrónico" });
     }
 
     const verificarPassword = await ClienteBDD.matchPassword(password);
@@ -176,7 +187,7 @@ const loginCliente = async (req, res) => {
     let token;
     if (environment === WEB) {
       token = generarJWT(ClienteBDD._id, ClienteBDD.nombre)
-    }else if (environment === MOBILE) {
+    } else if (environment === MOBILE) {
       token = generarJWTSinCaducidad(ClienteBDD._id, ClienteBDD.nombre);
     } else {
       return res.status(400).json({ msg: "Entorno no válido" });
@@ -398,15 +409,14 @@ const recuperarContrasenia = async (req, res) => {
     res.json({ msg: "Código de recuperación enviado al correo" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ msg: "Error al enviar el código de recuperación" });
+    res.status(500).json({ msg: "Error al enviar el código de recuperación", error: error.message });
   }
 };
-
 
 // Cambiar contraseña
 const cambiarContrasenia = async (req, res) => {
   let { email, nuevaPassword } = req.body;
-  let { codigoRecuperacion } = req.query; 
+  let { codigoRecuperacion } = req.query;
 
   // Limpiar
   email = email?.trim().toLowerCase();
@@ -418,30 +428,31 @@ const cambiarContrasenia = async (req, res) => {
     return res.status(400).json({ msg: "Todos los campos son obligatorios" });
   }
 
+  if (!/^\d{6}$/.test(codigoRecuperacion)) {
+    return res.status(400).json({ msg: "El código de recuperación debe tener exactamente 6 dígitos numéricos" });
+  }
+
   try {
     const cliente = await Clientes.findOne({ email });
 
     if (!cliente) {
-      return res.status(404).json({ msg: "Cliente no encontrado" });
+      return res.status(404).json({ msg: "Cliente no encontrado con ese correo" });
     }
 
     const codigoGuardado = cliente.codigoRecuperacion?.toString().trim();
     const ahora = Date.now();
 
-    console.log(">> código recibido:", codigoRecuperacion);
-    console.log(">> código guardado:", codigoGuardado);
-    console.log(">> expira en:", new Date(cliente.codigoRecuperacionExpires));
-    console.log(">> ahora es:", new Date());
-
     // Validación del código
-    if (
-      !/^\d{6}$/.test(codigoRecuperacion) ||
-      !codigoGuardado ||
-      codigoRecuperacion !== codigoGuardado ||
-      !cliente.codigoRecuperacionExpires ||
-      cliente.codigoRecuperacionExpires < ahora
-    ) {
-      return res.status(400).json({ msg: "Código de recuperación inválido o expirado" });
+    if (!codigoGuardado) {
+      return res.status(400).json({ msg: "No se ha generado ningún código de recuperación para este cliente" });
+    }
+
+    if (codigoRecuperacion !== codigoGuardado) {
+      return res.status(400).json({ msg: "El código ingresado no coincide con el registrado" });
+    }
+
+    if (!cliente.codigoRecuperacionExpires || cliente.codigoRecuperacionExpires < ahora) {
+      return res.status(400).json({ msg: "El código de recuperación ha expirado, solicita uno nuevo" });
     }
 
     // Cambiar contraseña
@@ -454,23 +465,23 @@ const cambiarContrasenia = async (req, res) => {
 
     await cliente.save();
 
-    res.json({ msg: "Contraseña cambiada con éxito" });
+    res.json({ msg: "Contraseña cambiada con éxito. Ya puedes iniciar sesión." });
 
   } catch (error) {
-    console.error("Error al cambiar la contraseña del cliente:", error);
-    res.status(500).json({ msg: "Error al cambiar la contraseña" });
+    console.error("Error al cambiar la contraseña:", error);
+    res.status(500).json({ msg: "Error al cambiar la contraseña", error: error.message });
   }
 };
 
 const getAllClientes = async (req, res) => {
   try {
     // Extraer y convertir los parámetros de consulta
-    let page = parseInt(req.query.page, 10) || 1;
-    let limit = parseInt(req.query.limit, 10) || 10;
+    let page = parseInt(req.query.page, 10);
+    let limit = parseInt(req.query.limit, 10);
 
     // Validar que 'page' y 'limit' sean números enteros positivos
-    if (page < 1) page = 1;
-    if (limit < 1) limit = 10;
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(limit) || limit < 1) limit = 10;
 
     const skip = (page - 1) * limit;
 
@@ -488,7 +499,7 @@ const getAllClientes = async (req, res) => {
 
     // Verificar si se encontraron clientes
     if (clientes.length === 0) {
-      return res.status(404).json({ msg: "No se encontraron clientes" });
+      return res.status(404).json({ msg: "No se encontraron clientes en la base de datos.", paginaConsultada: page });
     }
 
     // Responder con los clientes y la información de paginación
@@ -500,7 +511,7 @@ const getAllClientes = async (req, res) => {
     });
   } catch (error) {
     console.error("Error al obtener clientes:", error);
-    return res.status(500).json({ msg: "Error al obtener los clientes", error: error.message });
+    return res.status(500).json({ msg: "Error al obtener la lista de los clientes", error: error.message });
   }
 };
 
@@ -508,123 +519,32 @@ const getClienteById = async (req, res) => {
   const { id } = req.params;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ msg: "ID inválido" });
+    return res.status(400).json({
+      msg: "El ID proporcionado no es válido. Verifica el formato del identificador.",
+      id_recibido: id
+    });
   }
 
   try {
     const cliente = await Clientes.findById(id).select("-password -token -codigoRecuperacion -codigoRecuperacionExpires");
 
     if (!cliente) {
-      return res.status(404).json({ msg: "Cliente no encontrado" });
+      return res.status(404).json({ msg: "No se encontró ningún cliente con el ID proporcionado.", id });
     }
 
-    res.status(200).json(cliente);
+    res.status(200).json({ msg: "Cliente encontrado exitosamente", cliente });
   } catch (error) {
-    res.status(500).json({ msg: "Error al buscar el cliente", error: error.message });
-  }
-};
-
-const createClienteAdmin = async (req, res) => {
-  const { nombre, apellido, genero, email, password } = req.body;
-
-  if (!nombre || !apellido || !genero || !email || !password) {
-    return res.status(400).json({ msg: "Todos los campos son obligatorios" });
-  }
-
-  const existe = await Clientes.findOne({ email });
-  if (existe) {
-    return res.status(400).json({ msg: "Este email ya está registrado" });
-  }
-
-  try {
-    // 1. Crear cliente sin token
-    const nuevoCliente = new Clientes({
-      nombre,
-      apellido,
-      genero,
-      email,
-      password: await bcrypt.hash(password, 10),
-      confirmEmail: true // Si quieres que se confirme automáticamente desde admin
-    });
-
-    await nuevoCliente.save();
-
-    // 2. Generar token y asignarlo
-    const token = nuevoCliente.crearToken();
-    nuevoCliente.token = token;
-    await nuevoCliente.save();
-
-    // 3. Enviar correo de confirmación
-    try {
-      await sendMailToUser(email, token);
-    } catch (mailError) {
-      console.error("Error al enviar el correo:", mailError.message);
-      return res.status(500).json({ msg: "Cliente creado, pero falló el envío del correo de confirmación" });
-    }
-
-    // 4. Retornar cliente sin datos sensibles
-    const {
-      password: _,
-      token: __,
-      codigoRecuperacion,
-      codigoRecuperacionExpires,
-      ...clienteSeguro
-    } = nuevoCliente.toObject();
-
-    return res.status(200).json({
-      msg: "Solicita al cliente revisar su correo electrónico para confirmar su cuenta",
-      cliente: clienteSeguro
-    });
-
-  } catch (error) {
-    console.error("Error al crear cliente:", error.message);
-    return res.status(500).json({ msg: "Error al crear cliente", error: error.message });
-  }
-};
-
-const updateClienteAdmin = async (req, res) => {
-  const { id } = req.params;
-  const camposPermitidos = [
-    "cedula", "nombre", "apellido", "genero", "email",
-    "direccion", "telefono", "fecha_nacimiento"
-  ];
-  const datos = req.body;
-
-  try {
-    const cliente = await Clientes.findById(id);
-    if (!cliente) return res.status(404).json({ msg: "Cliente no encontrado" });
-
-    // Reemplazar imagen si se subió una nueva
-    if (req.file) {
-      // Eliminar imagen anterior si existe
-      if (cliente.imagen_id) {
-        try {
-          await cloudinary.uploader.destroy(cliente.imagen_id);
-        } catch (error) {
-          console.warn("No se pudo eliminar la imagen anterior en Cloudinary:", error.message);
-        }
-      }
-
-      // Guardar nueva imagen
-      cliente.imagen = req.file.path;
-      cliente.imagen_id = req.file.filename;
-    }
-
-    // Actualizar los demás campos permitidos
-    camposPermitidos.forEach(campo => {
-      if (datos[campo] !== undefined) cliente[campo] = datos[campo];
-    });
-
-    await cliente.save();
-    res.status(200).json({ msg: "Cliente actualizado correctamente" });
-
-  } catch (error) {
-    res.status(500).json({ msg: "Error al actualizar cliente", error: error.message });
+    console.error(`Error al buscar cliente con ID ${id}:`, error);
+    res.status(500).json({ msg: "Ocurrió un error al buscar el cliente.", error: error.message });
   }
 };
 
 const desactiveClienteAdmin = async (req, res) => {
   const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "ID de cliente no válido" });
+  }
 
   try {
     const cliente = await Clientes.findById(id);
@@ -633,20 +553,25 @@ const desactiveClienteAdmin = async (req, res) => {
     }
 
     if (cliente.estado === 'inactivo') {
-      return res.status(400).json({ msg: "El cliente ya está inactivo" });
+      return res.status(400).json({  error: `El cliente '${cliente.nombre} ${cliente.apellido}' ya está inactivo` });
     }
 
     await Clientes.findByIdAndUpdate(id, { estado: 'inactivo' });
 
-    res.status(200).json({ msg: "Estado del cliente actualizado a inactivo exitosamente" });
+    res.status(200).json({ msg: `Estado del cliente '${cliente.nombre} ${cliente.apellido}' actualizado a inactivo exitosamente` });
 
   } catch (error) {
-    res.status(500).json({ msg: "Error al actualizar el estado del cliente", error: error.message });
+    console.error("Error en desactiveClienteAdmin:", error);
+    res.status(500).json({ error: "Error al actualizar el estado del cliente", detalle: error.message });
   }
 };
 
 const activeClienteAdmin = async (req, res) => {
   const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "ID de cliente no válido" });
+  }
 
   try {
     const cliente = await Clientes.findById(id);
@@ -655,14 +580,15 @@ const activeClienteAdmin = async (req, res) => {
     }
 
     if (cliente.estado === 'activo') {
-      return res.status(400).json({ msg: "El cliente ya está activo" });
+      return res.status(400).json({ error: `El cliente '${cliente.nombre} ${cliente.apellido}' ya está activo` });
     }
 
     await Clientes.findByIdAndUpdate(id, { estado: 'activo' });
 
-    res.status(200).json({ msg: "Estado del cliente actualizado a activo exitosamente" });
+    res.status(200).json({ msg: `Estado del cliente '${cliente.nombre} ${cliente.apellido}' actualizado a inactivo exitosamente` });
   } catch (error) {
-    res.status(500).json({ msg: "Error al actualizar el estado del cliente", error: error.message });
+    console.error("Error en activeClienteAdmin:", error);
+    res.status(500).json({ error: "Error al actualizar el estado del cliente", detalle: error.message });
   }
 };
 
@@ -676,8 +602,6 @@ export {
 
   getAllClientes,
   getClienteById,
-  createClienteAdmin,
-  updateClienteAdmin,
   desactiveClienteAdmin,
   activeClienteAdmin
 };

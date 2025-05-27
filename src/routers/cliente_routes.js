@@ -10,8 +10,6 @@ import {
 
     getClienteById,
     getAllClientes,
-    createClienteAdmin,
-    updateClienteAdmin,
     desactiveClienteAdmin,
     activeClienteAdmin
 
@@ -34,10 +32,6 @@ router.get("/confirmarCliente/:token", confirmEmail);
 // Rutas privadas (solo para administradores)
 router.get("/admin/clientes", verificarAuthAdmin, getAllClientes);
 router.get("/admin/clientes/:id", verificarAuthAdmin, getClienteById);
-router.post("/admin/clientes", verificarAuthAdmin, validarCliente, manejarErrores, createClienteAdmin);
-router.put("/admin/clientes/:id", verificarAuthAdmin,(req, res, next) => {req.folderName = "clientes";
-    next();
-}, upload.single("imagen"), validarClientePerfil, manejarErrores, updateClienteAdmin);
 router.delete("/admin/clientes/:id", verificarAuthAdmin, desactiveClienteAdmin);
 router.patch("/admin/clientes/activar/:id", verificarAuthAdmin, activeClienteAdmin);
 

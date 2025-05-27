@@ -1,6 +1,7 @@
 import Ventas from "../models/ventas.js";
 import Producto from "../models/productos.js";
 import Clientes from "../models/clientes.js";
+import Carrito from "../models/carritos.js";
 import mongoose from "mongoose";
 
 // Obtener todas las ventas
@@ -113,7 +114,7 @@ const createVentaCliente = async (req, res) => {
       }
 
       if (!producto.activo) {
-        return res.status(400).jason({ msg: `El producto ${producto.nombre} está descontinuado y no puede ser añadido.` });
+        return res.status(400).json({ msg: `El producto ${producto.nombre} está descontinuado y no puede ser añadido.` });
       }
 
       // Verificar stock suficiente
@@ -144,6 +145,12 @@ const createVentaCliente = async (req, res) => {
 
     await nuevaVenta.save();
 
+    // Vaciar el carrito del cliente
+    await Carrito.findOneAndUpdate(
+      { cliente_id: clienteId },
+      { productos: [], total: 0 }
+    );
+
     // 🔥 Limpiar _id de productos
     const ventaSinIdsInternos = {
       ...nuevaVenta._doc,
@@ -157,97 +164,6 @@ const createVentaCliente = async (req, res) => {
 
   } catch (error) {
     console.error("Error al crear venta:", error);
-    res.status(500).json({ msg: "Error interno del servidor" });
-  }
-};
-
-const createVentaAdmin = async (req, res) => {
-  let { productos, cliente_id } = req.body;
-
-  // Limpiar espacios
-  cliente_id = cliente_id ? cliente_id.toString().trim() : "";
-
-  // Validar cliente_id
-  if (!cliente_id) {
-    return res.status(400).json({ msg: "Debes proporcionar el ID del cliente" });
-  }
-
-  // Validar productos
-  if (!productos || !Array.isArray(productos) || productos.length === 0) {
-    return res.status(400).json({ msg: "Debes agregar al menos un producto" });
-  }
-
-  try {
-    const clienteExistente = await Clientes.findById(cliente_id);
-    if (!clienteExistente) {
-      return res.status(404).json({ msg: "Cliente no encontrado" });
-    }
-
-    let totalVenta = 0;
-    const productosConDetalles = [];
-
-    for (let i = 0; i < productos.length; i++) {
-      const item = productos[i];
-      const producto_id = item.producto_id ? item.producto_id.toString().trim() : "";
-      const cantidad = item.cantidad;
-
-      // Validaciones estrictas
-      if (!producto_id || producto_id.length === 0) {
-        return res.status(400).json({ msg: `El campo "producto_id" está vacío o mal formado en el índice ${i}` });
-      }
-
-      if (!cantidad || isNaN(cantidad) || cantidad <= 0) {
-        return res.status(400).json({ msg: `El campo "cantidad" es inválido en el índice ${i}` });
-      }
-
-      const producto = await Producto.findById(producto_id);
-      if (!producto) {
-        return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
-      }
-
-      if (!producto.activo) {
-        return res.status(400).json({ msg: `El producto ${producto.nombre} está descontinuado y no puede ser añadido.` });
-      }
-
-      if (producto.stock < cantidad) {
-        return res.status(400).json({ msg: `Stock insuficiente para ${producto.nombre}. Stock disponible: ${producto.stock}` });
-      }
-
-      producto.stock -= cantidad;
-      await producto.save();
-
-      const subtotal = producto.precio * cantidad;
-      totalVenta += subtotal;
-
-      productosConDetalles.push({
-        producto_id: producto._id,
-        cantidad: cantidad,
-        subtotal: subtotal,
-      });
-    }
-
-    const nuevaVenta = new Ventas({
-      cliente_id: clienteExistente._id,
-      productos: productosConDetalles,
-      total: totalVenta,
-      estado: "pendiente",
-    });
-
-    await nuevaVenta.save();
-
-    //Limpiar _id internos antes de responder
-    const ventaSinIdsInternos = {
-      ...nuevaVenta._doc,
-      productos: nuevaVenta.productos.map(p => {
-        const { _id, ...resto } = p._doc;
-        return resto;
-      })
-    };
-
-    res.status(201).json({ msg: "Venta creada exitosamente", venta: ventaSinIdsInternos });
-
-  } catch (error) {
-    console.error("Error al crear venta por admin:", error);
     res.status(500).json({ msg: "Error interno del servidor" });
   }
 };
@@ -454,8 +370,8 @@ const getDashboardController = async (req, res) => {
       for (const venta of ventas) {
         for (const p of venta.productos) {
           const tipo = p.producto_id?.tipo?.toLowerCase();
-          if (tipo === "jabón" || tipo === "jabon") jabones += 1;
-          if (tipo === "vela") velas += 1;
+          if (tipo === "jabón" || tipo === "jabon") jabones += p.cantidad;
+          if (tipo === "vela") velas += p.cantidad;
         }
       }
 
@@ -477,7 +393,6 @@ export {
   getAllVentasController,
   getVentaByIDController,
   createVentaCliente,
-  createVentaAdmin,
   updateVentaController,
   deleteVentaController,
   getVentasClienteController,

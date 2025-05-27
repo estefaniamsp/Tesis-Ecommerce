@@ -13,8 +13,8 @@ const getAllCategoriasController = async (req, res) => {
 
     return res.status(200).json({ categorias });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ msg: "Error al obtener las categorías", error });
+    console.error("Error al obtener las categorías:", error);
+    return res.status(500).json({ msg: "Error al obtener las categorías", error: error.message });
   }
 };
 
@@ -25,7 +25,7 @@ const getCategoriaByIDController = async (req, res) => {
 
     // Verificar si el ID es válido
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(404).json({ msg: "Categoría no encontrada" });
+      return res.status(400).json({ msg: "ID de categoría no válida" });
     }
 
     // Buscar la categoría por su ID
@@ -37,8 +37,8 @@ const getCategoriaByIDController = async (req, res) => {
 
     return res.status(200).json({ categoria });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ msg: "Error al obtener la categoría", error });
+    console.error("Error al obtener la categoría:", error);
+    return res.status(500).json({ msg: "Error al obtener la categoría", error: error.message });
   }
 };
 
@@ -78,9 +78,13 @@ const createCategoriaController = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Error al crear la categoría:", error);
     if (req.file?.filename) {
-      await cloudinary.uploader.destroy(req.file.filename);
+      try {
+        await cloudinary.uploader.destroy(req.file.filename);
+      } catch (cloudError) {
+        console.warn("Error al eliminar la imagen después del fallo:", cloudError.message);
+      }
     }
     return res.status(500).json({
       msg: "Ocurrió un error interno. La imagen subida fue eliminada.",
@@ -129,7 +133,7 @@ const updateCategoriaController = async (req, res) => {
     return res.status(200).json({ msg: "Categoría actualizada exitosamente", categoria });
 
   } catch (error) {
-    console.error(error);
+    console.error("Error al actualizar la categoría:", error);
     return res.status(500).json({ msg: "Error al actualizar la categoría", error: error.message });
   }
 };
@@ -160,8 +164,8 @@ const deleteCategoriaController = async (req, res) => {
     return res.status(200).json({ msg: "Categoría eliminada exitosamente" });
 
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ msg: "Error al eliminar la categoría", error });
+    console.error("Error al actualizar la categoría:", error);
+    return res.status(500).json({ msg: "Error al eliminar la categoría", error: error.message });
   }
 };
 
