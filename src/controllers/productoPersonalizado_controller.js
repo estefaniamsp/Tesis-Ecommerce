@@ -1,6 +1,5 @@
 import ProductoPersonalizado from "../models/productosPersonalizados.js";
 import Ingrediente from "../models/ingredientes.js";
-import Cliente from "../models/clientes.js";
 import mongoose from "mongoose";
 import cloudinary from "../config/cloudinary.js";
 
@@ -45,10 +44,7 @@ const getAllProductosPersonalizadosController = async (req, res) => {
 
     } catch (error) {
         console.error("Error al obtener los productos personalizados:", error);
-        return res.status(500).json({
-            msg: "Error al obtener los productos personalizados",
-            error: error.message || error
-        });
+        return res.status(500).json({ msg: "Error al obtener los productos personalizados", error: error.message || error });
     }
 };
 
@@ -81,32 +77,26 @@ const getProductoPersonalizadoByIDController = async (req, res) => {
 
     } catch (error) {
         console.error("Error al obtener producto personalizado:", error.message || error);
-        return res.status(500).json({
-            msg: "Error al obtener el producto",
-            error: error.message || "Error desconocido"
-        });
+        return res.status(500).json({ msg: "Error al obtener el producto", error: error.message || "Error desconocido" });
     }
 };
 
 // Crear un nuevo producto personalizado
 const createProductoPersonalizadoController = async (req, res) => {
     try {
-        // Validar que el cliente esté autenticado
+
         if (!req.clienteBDD) {
             return res.status(403).json({ msg: "Solo los clientes pueden crear productos personalizados." });
         }
 
-        // Extraer campos desde el form-data
         let { ingredientes, tipo, id_categoria } = req.body;
 
         console.log("📦 Datos recibidos:", { ingredientes, tipo, id_categoria });
 
-        // Validar que venga al menos un ingrediente
         if (!ingredientes) {
             return res.status(400).json({ msg: "Debe haber al menos un ingrediente." });
         }
 
-        // Convertir a array si solo viene uno
         if (typeof ingredientes === "string") {
             ingredientes = [ingredientes];
         }
@@ -115,28 +105,23 @@ const createProductoPersonalizadoController = async (req, res) => {
             return res.status(400).json({ msg: "Debe haber al menos un ingrediente." });
         }
 
-        // Validar tipo
         if (!tipo || !tipo.trim()) {
             return res.status(400).json({ msg: "El campo 'tipo' es obligatorio (ej: 'jabón' o 'vela')." });
         }
 
-        // Validar id_categoria
         if (!id_categoria || !mongoose.Types.ObjectId.isValid(id_categoria)) {
             return res.status(400).json({ msg: "ID de categoría no válido." });
         }
 
-        // Validar existencia real de ingredientes
         const ingredientesEnBD = await Ingrediente.find({ _id: { $in: ingredientes } });
         if (ingredientesEnBD.length !== ingredientes.length) {
             return res.status(400).json({ msg: "Uno o más ingredientes no existen en la base de datos." });
         }
 
-        // Validar imagen
         if (!req.file) {
             return res.status(400).json({ msg: "La imagen del producto personalizado es obligatoria." });
         }
 
-        // Calcular precio
         const precio = ingredientesEnBD.reduce((total, ing) => total + ing.precio, 0);
 
         // Crear producto
@@ -163,15 +148,12 @@ const createProductoPersonalizadoController = async (req, res) => {
         if (req.file?.filename) {
             try {
                 await cloudinary.uploader.destroy(req.file.filename);
-            } catch (e) {
-                console.warn("No se pudo eliminar la imagen tras error:", e.message);
+            } catch (error) {
+                console.warn("No se pudo eliminar la imagen tras error:", error.message);
             }
         }
 
-        return res.status(500).json({
-            msg: "Error al crear el producto personalizado",
-            error: error.message,
-        });
+        return res.status(500).json({ msg: "Error al crear el producto personalizado", error: error.message });
     }
 };
 
@@ -200,12 +182,10 @@ const updateProductoPersonalizadoController = async (req, res) => {
             return res.status(404).json({ msg: "Producto no encontrado o no autorizado" });
         }
 
-        // Parsear ingredientes si vienen como string
         if (typeof ingredientes === "string") {
             ingredientes = [ingredientes];
         }
 
-        // Validar e insertar nuevos ingredientes si se envían
         if (ingredientes && Array.isArray(ingredientes)) {
             const ingredientesDB = await Ingrediente.find({ _id: { $in: ingredientes } });
             if (ingredientesDB.length !== ingredientes.length) {
@@ -216,7 +196,6 @@ const updateProductoPersonalizadoController = async (req, res) => {
             producto.precio = ingredientesDB.reduce((acc, ing) => acc + ing.precio, 0);
         }
 
-        // Reemplazo de imagen si se envía una nueva
         if (req.file) {
             if (producto.imagen_id) {
                 try {
@@ -239,17 +218,14 @@ const updateProductoPersonalizadoController = async (req, res) => {
 
     } catch (error) {
         console.error("Error al actualizar producto personalizado:", error);
-        return res.status(500).json({
-            msg: "Error al actualizar el producto",
-            error: error.message,
-        });
+        return res.status(500).json({ msg: "Error al actualizar el producto", error: error.message });
     }
 };
 
 // Eliminar un producto personalizado
 const deleteProductoPersonalizadoController = async (req, res) => {
   try {
-    // Verifica que sea un cliente autenticado
+
     if (!req.clienteBDD) {
       return res.status(403).json({ msg: "Solo los clientes pueden eliminar productos personalizados." });
     }
@@ -271,7 +247,6 @@ const deleteProductoPersonalizadoController = async (req, res) => {
       return res.status(403).json({ msg: "No tienes permiso para eliminar este producto." });
     }
 
-    // Eliminar imagen en Cloudinary si existe
     if (producto.imagen_id) {
       try {
         await cloudinary.uploader.destroy(producto.imagen_id);

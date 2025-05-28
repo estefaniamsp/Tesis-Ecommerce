@@ -203,6 +203,7 @@ const loginCliente = async (req, res) => {
       email: ClienteBDD.email,
       _id,
     });
+    
   } catch (error) {
     console.error("Error en loginCliente:", error.message);
     res.status(500).json({ msg: "Error interno del servidor" });
@@ -212,131 +213,92 @@ const loginCliente = async (req, res) => {
 // Actualizar perfil de cliente
 const updateClienteProfile = async (req, res) => {
   try {
-    let { _id } = req.clienteBDD;
-    _id = _id.toString();
+    const clienteId = req.clienteBDD._id.toString();
+    const body = req.body;
 
-    let {
-      cedula,
-      nombre,
-      apellido,
-      genero,
-      email,
-      direccion,
-      telefono,
-      fecha_nacimiento
-    } = req.body;
+    const campos = {
+      cedula: body.cedula?.trim(),
+      nombre: body.nombre?.trim(),
+      apellido: body.apellido?.trim(),
+      genero: body.genero?.trim(),
+      email: body.email?.trim(),
+      direccion: body.direccion?.trim(),
+      telefono: body.telefono?.trim(),
+      fecha_nacimiento: body.fecha_nacimiento?.trim()
+    };
 
-    // Limpiar espacios
-    cedula = cedula?.trim();
-    nombre = nombre?.trim();
-    apellido = apellido?.trim();
-    genero = genero?.trim();
-    email = email?.trim();
-    direccion = direccion?.trim();
-    telefono = telefono?.trim();
-    fecha_nacimiento = fecha_nacimiento?.trim();
-
-    const cliente = await Clientes.findById(_id);
+    const cliente = await Clientes.findById(clienteId);
     if (!cliente) {
       return res.status(404).json({ msg: "Cliente no encontrado" });
     }
 
-    // Validación de perfil incompleto
-    const camposFaltantes = [];
-    if (!cliente.nombre && !nombre) camposFaltantes.push("nombre");
-    if (!cliente.apellido && !apellido) camposFaltantes.push("apellido");
-    if (!cliente.genero && !genero) camposFaltantes.push("genero");
-    if (!cliente.cedula && !cedula) camposFaltantes.push("cedula");
-    if (!cliente.telefono && !telefono) camposFaltantes.push("telefono");
-    if (!cliente.fecha_nacimiento && !fecha_nacimiento) camposFaltantes.push("fecha_nacimiento");
+    // Verificar si el perfil está incompleto y se intenta editar individualmente
+    const camposObligatorios = ["nombre", "apellido", "genero", "cedula", "telefono", "fecha_nacimiento"];
+    const faltantes = camposObligatorios.filter(campo => !cliente[campo] && !campos[campo]);
 
-    if (camposFaltantes.length > 0) {
+    if (faltantes.length > 0) {
       return res.status(400).json({
         msg: "Debes completar tu perfil antes de editar individualmente.",
-        campos_obligatorios: camposFaltantes
+        campos_obligatorios: faltantes
       });
     }
 
-    // Validaciones básicas
-    if (nombre && !/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(nombre)) {
+    // Validaciones de formato
+    const regexNombre = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
+    if (campos.nombre && !regexNombre.test(campos.nombre)) {
       return res.status(400).json({ msg: "El nombre solo debe contener letras" });
     }
-
-    if (apellido && !/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(apellido)) {
+    if (campos.apellido && !regexNombre.test(campos.apellido)) {
       return res.status(400).json({ msg: "El apellido solo debe contener letras" });
     }
-
-    if (genero && genero !== "masculino" && genero !== "femenino") {
+    if (campos.genero && !["masculino", "femenino"].includes(campos.genero)) {
       return res.status(400).json({ msg: "El género debe ser 'masculino' o 'femenino'" });
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (email && !emailRegex.test(email)) {
+    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (campos.email && !regexEmail.test(campos.email)) {
       return res.status(400).json({ msg: "El correo ingresado no es válido" });
     }
-
-    if (telefono && !/^\d{10}$/.test(telefono)) {
+    if (campos.telefono && !/^\d{10}$/.test(campos.telefono)) {
       return res.status(400).json({ msg: "El teléfono debe tener exactamente 10 números" });
     }
-
-    if (cedula && !/^\d{10}$/.test(cedula)) {
+    if (campos.cedula && !/^\d{10}$/.test(campos.cedula)) {
       return res.status(400).json({ msg: "La cédula debe tener exactamente 10 números" });
     }
-
-    if (fecha_nacimiento && !/^\d{4}-\d{2}-\d{2}$/.test(fecha_nacimiento)) {
+    if (campos.fecha_nacimiento && !/^\d{4}-\d{2}-\d{2}$/.test(campos.fecha_nacimiento)) {
       return res.status(400).json({ msg: "La fecha de nacimiento debe tener el formato YYYY-MM-DD" });
     }
 
-    // Validación de duplicados
-    if (email && email !== cliente.email) {
-      const emailExistente = await Clientes.findOne({ email });
-      if (emailExistente && emailExistente._id.toString() !== _id) {
-        return res.status(400).json({ msg: "El email ya está en uso por otro cliente" });
-      }
-    }
-
-    if (cedula && cedula !== cliente.cedula) {
-      const cedulaExistente = await Clientes.findOne({ cedula });
-      if (cedulaExistente && cedulaExistente._id.toString() !== _id) {
-        return res.status(400).json({ msg: "La cédula ya está registrada por otro cliente" });
-      }
-    }
-
-    if (telefono && telefono !== cliente.telefono) {
-      const telefonoExistente = await Clientes.findOne({ telefono });
-      if (telefonoExistente && telefonoExistente._id.toString() !== _id) {
-        return res.status(400).json({ msg: "El teléfono ya está registrado por otro cliente" });
-      }
-    }
-
-    // Actualizar campos enviados
-    if (cedula) cliente.cedula = cedula;
-    if (nombre) cliente.nombre = nombre;
-    if (apellido) cliente.apellido = apellido;
-    if (genero) cliente.genero = genero;
-    if (email) cliente.email = email;
-    if (direccion) cliente.direccion = direccion;
-    if (telefono) cliente.telefono = telefono;
-    if (fecha_nacimiento) cliente.fecha_nacimiento = fecha_nacimiento;
-
-    // Imagen
-    const imagenFile = req.file;
-    if (imagenFile) {
-      if (cliente.imagen_id) {
-        try {
-          await cloudinary.uploader.destroy(cliente.imagen_id);
-        } catch (err) {
-          console.error("Error al borrar imagen anterior:", err.message);
+    // Verificar duplicados
+    for (const [campo, valor] of Object.entries(campos)) {
+      if (valor && valor !== cliente[campo]) {
+        const existe = await Clientes.findOne({ [campo]: valor });
+        if (existe && existe._id.toString() !== clienteId) {
+          return res.status(400).json({ msg: `El ${campo} ya está registrado por otro cliente` });
         }
       }
+    }
 
-      cliente.imagen = imagenFile.path;
-      cliente.imagen_id = imagenFile.filename;
+    // Actualizar solo los campos recibidos
+    Object.entries(campos).forEach(([key, value]) => {
+      if (value !== undefined) cliente[key] = value;
+    });
+
+    // Procesar imagen si se sube
+    if (req.file) {
+      try {
+        if (cliente.imagen_id) {
+          await cloudinary.uploader.destroy(cliente.imagen_id);
+        }
+        cliente.imagen = req.file.path;
+        cliente.imagen_id = req.file.filename;
+      } catch (err) {
+        console.warn("Error al actualizar imagen en Cloudinary:", err.message);
+      }
     }
 
     await cliente.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       msg: "Perfil actualizado con éxito",
       cliente: {
         cedula: cliente.cedula,
@@ -352,32 +314,39 @@ const updateClienteProfile = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error al actualizar el perfil:", error);
+    console.error("Error al actualizar perfil:", error);
     if (!res.headersSent) {
-      return res.status(500).json({ msg: "Error del servidor al actualizar el perfil" });
+      res.status(500).json({ msg: "Error del servidor al actualizar el perfil" });
     }
   }
 };
 
-
 // Recuperar contraseña (envía un código por email)
 const recuperarContrasenia = async (req, res) => {
-  const { email } = req.body;
-
   try {
-    const cliente = await Clientes.findOne({ email });
-    console.log("Cliente encontrado:", cliente);
+    // 1. Validar y limpiar entrada
+    let { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ msg: "El correo electrónico es obligatorio" });
+    }
+    email = email.trim().toLowerCase();
 
+    // 2. Buscar cliente
+    const cliente = await Clientes.findOne({ email });
     if (!cliente) {
-      return res.status(404).json({ msg: "Correo no registrado" });
+      return res.status(404).json({ msg: "El correo no está registrado" });
     }
 
-    const codigoRecuperacion = Math.floor(100000 + Math.random() * 900000);
-    cliente.codigoRecuperacion = codigoRecuperacion.toString();
-    cliente.codigoRecuperacionExpires = Date.now() + 10 * 60 * 1000; // ⏳ 10 minutos
+    // 3. Generar código y guardar
+    const codigoRecuperacion = Math.floor(100000 + Math.random() * 900000).toString();
+    const duracionEnMinutos = 4;
+    const tiempoExpiracion = Date.now() + duracionEnMinutos * 60 * 1000;
 
+    cliente.codigoRecuperacion = codigoRecuperacion;
+    cliente.codigoRecuperacionExpires = tiempoExpiracion;
     await cliente.save();
 
+    // 4. Configurar y enviar correo
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -386,10 +355,10 @@ const recuperarContrasenia = async (req, res) => {
       },
     });
 
-    await transporter.sendMail({
-      from: process.env.USER_MAILTRAP,
+    const info = await transporter.sendMail({
+      from: `"Soporte E-commerce Artesanal" <${process.env.USER_MAILTRAP}>`,
       to: email,
-      subject: "🔐 Código de recuperación de contraseña",
+      subject: "Código de recuperación de contraseña",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #e0e0e0; border-radius: 8px;">
           <h2 style="color: #2c3e50;">Recuperación de contraseña</h2>
@@ -398,18 +367,24 @@ const recuperarContrasenia = async (req, res) => {
           <div style="font-size: 24px; font-weight: bold; margin: 20px 0; text-align: center; color: #1abc9c;">
             ${codigoRecuperacion}
           </div>
-          <p>Este código es válido por 10 minutos.</p>
+          <p>Este código es válido por ${duracionEnMinutos} minutos.</p>
           <p>Si no solicitaste este cambio, puedes ignorar este mensaje.</p>
           <hr style="margin: 30px 0;">
           <p style="font-size: 12px; color: #888;">Este mensaje fue generado automáticamente, no respondas a este correo.</p>
         </div>
-      `
+      `,
     });
 
-    res.json({ msg: "Código de recuperación enviado al correo" });
+    console.log("Código enviado:", info.messageId);
+
+    res.status(200).json({ msg: "El código de recuperación ha sido enviado a tu correo" });
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ msg: "Error al enviar el código de recuperación", error: error.message });
+    console.error("Error al recuperar contraseña:", error);
+    res.status(500).json({
+      msg: "Ocurrió un error al intentar enviar el código de recuperación",
+      error: error.message,
+    });
   }
 };
 
@@ -553,7 +528,7 @@ const desactiveClienteAdmin = async (req, res) => {
     }
 
     if (cliente.estado === 'inactivo') {
-      return res.status(400).json({  error: `El cliente '${cliente.nombre} ${cliente.apellido}' ya está inactivo` });
+      return res.status(400).json({ error: `El cliente '${cliente.nombre} ${cliente.apellido}' ya está inactivo` });
     }
 
     await Clientes.findByIdAndUpdate(id, { estado: 'inactivo' });
