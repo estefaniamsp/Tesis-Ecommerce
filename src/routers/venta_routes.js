@@ -22,9 +22,10 @@ router.get('/ventas/cliente/factura/:id', verificarAutenticacion, getFacturaClie
 
 // Rutas para el administrador 
 router.get('/ventas', verificarAuthAdmin, getAllVentasController);
+router.get('/ventas/dashboard', verificarAuthAdmin, getDashboardController);
 router.get('/ventas/:id', verificarAuthAdmin, getVentaByIDController);
 router.put('/ventas/:id', verificarAuthAdmin, updateVentaController);
 router.delete('/ventas/:id', verificarAuthAdmin, deleteVentaController);
-router.get('/ventas/dashboard/stats', verificarAuthAdmin, getDashboardController);
+
 
 export default router;

@@ -347,6 +347,14 @@ export const validarIngrediente = [
         .isMongoId()
         .withMessage("El id de la categoría debe ser un ObjectId válido."),
 
+    check("tipo")
+        .notEmpty()
+        .withMessage('El campo "tipo" es obligatorio')
+        .isLength({ min: 3, max: 20 })
+        .withMessage("El tipo debe tener entre 3 y 20 caracteres.")
+        .isAlpha("es-ES", { ignore: "áéíóúÁÉÍÓÚñÑ " })
+        .withMessage("El tipo solo debe contener letras."),
+        
     body("imagen")
         .custom((value, { req }) => {
             if (!req.file) {

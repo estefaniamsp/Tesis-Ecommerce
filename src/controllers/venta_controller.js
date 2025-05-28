@@ -335,59 +335,91 @@ const getFacturaClienteById = async (req, res) => {
 // Obtener estadísticas generales
 const getDashboardController = async (req, res) => {
   try {
-    const { scope } = req.query;
+    const { fechaInicio, fechaFin } = req.query;
 
-    const hoy = new Date();
-    const inicioSemana = new Date(hoy);
-    inicioSemana.setDate(hoy.getDate() - hoy.getDay() + 1); // lunes
-
-    const resultados = {};
-
-    if (!scope || scope.includes("clientes")) {
-      resultados.numeroClientes = await Clientes.countDocuments();
-    }
-
-    if (!scope || scope.includes("productos")) {
-      resultados.numeroProductos = await Producto.countDocuments();
-    }
-
-    if (!scope || scope.includes("ventas")) {
-      resultados.numeroVentas = await Ventas.countDocuments();
-    }
-
-    if (!scope || scope.includes("ventas_semanales")) {
-      resultados.numeroVentasSemanales = await Ventas.countDocuments({
-        fecha_venta: { $gte: inicioSemana }
+    if (!fechaInicio || !fechaFin) {
+      return res.status(400).json({
+        msg: "Se requieren los parámetros 'fechaInicio' y 'fechaFin'."
       });
     }
 
-    if (!scope || scope.includes("ventas_jabones") || scope.includes("ventas_velas")) {
-      const ventas = await Ventas.find().populate("productos.producto_id");
+    const inicio = new Date(`${fechaInicio}T00:00:00`);
+    const fin = new Date(`${fechaFin}T23:59:59`);
 
-      let jabones = 0;
-      let velas = 0;
-
-      for (const venta of ventas) {
-        for (const p of venta.productos) {
-          const tipo = p.producto_id?.tipo?.toLowerCase();
-          if (tipo === "jabón" || tipo === "jabon") jabones += p.cantidad;
-          if (tipo === "vela") velas += p.cantidad;
-        }
-      }
-
-      if (scope?.includes("ventas_jabones") || !scope) resultados.ventasJabones = jabones;
-      if (scope?.includes("ventas_velas") || !scope) resultados.ventasVelas = velas;
+    if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
+      return res.status(400).json({ msg: "Las fechas proporcionadas no son válidas." });
     }
 
-    return res.status(200).json(resultados);
+    if (inicio > fin) {
+      return res.status(400).json({ msg: "'fechaInicio' no puede ser mayor que 'fechaFin'." });
+    }
+
+    // 1. Total de clientes
+    const numeroClientes = await Clientes.countDocuments();
+
+    // 2. Ventas finalizadas entre fechas, con categoría de producto poblada
+    const ventas = await Ventas.find({
+      fecha_venta: { $gte: inicio, $lte: fin },
+      estado: "finalizado"
+    }).populate({
+      path: "productos.producto_id",
+      populate: { path: "id_categoria" }
+    });
+
+    // Inicializar mapa por día y contadores de categorías
+    const ventasPorDia = {};
+    let vendidos = { jabones: 0, velas: 0 };
+
+    for (const venta of ventas) {
+      // Formato de fecha: "dd/mm/yyyy"
+      const fecha = venta.fecha_venta.toLocaleDateString("es-EC", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      });
+
+      // Acumular total por día
+      ventasPorDia[fecha] = (ventasPorDia[fecha] || 0) + venta.total;
+
+      // Contar productos por categoría
+      for (const p of venta.productos) {
+        const categoriaNombre = p.producto_id?.id_categoria?.nombre?.toLowerCase().trim();
+
+        if (categoriaNombre?.includes("jabon")) vendidos.jabones += p.cantidad;
+        if (categoriaNombre?.includes("vela")) vendidos.velas += p.cantidad;
+      }
+    }
+
+    // Generar lista de fechas completas en el rango y rellenar con 0 si no hubo ventas
+    const ventasDiarias = [];
+    for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) {
+      const fecha = d.toLocaleDateString("es-EC", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      });
+      ventasDiarias.push({
+        fecha,
+        totalVentas: ventasPorDia[fecha] || 0
+      });
+    }
+
+    const ventasPorCategoria = [
+      { categoría: "jabones", vendidos: vendidos.jabones },
+      { categoría: "velas", vendidos: vendidos.velas }
+    ];
+
+    return res.status(200).json({
+      numeroClientes,
+      ventasDiarias,
+      ventasPorCategoria
+    });
 
   } catch (error) {
-    console.error("Error al obtener estadísticas:", error);
-    return res.status(500).json({ msg: "Error al obtener estadísticas", error: error.message });
+    console.error("Error en dashboard:", error);
+    return res.status(500).json({ msg: "Error en dashboard", error: error.message });
   }
 };
-
-
 
 export {
   getAllVentasController,

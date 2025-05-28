@@ -72,14 +72,14 @@ const getIngredienteByIDController = async (req, res) => {
 const createIngredienteController = async (req, res) => {
     let { nombre, stock, id_categoria, precio, tipo } = req.body;
 
-    if (!nombre || !stock || !id_categoria || !precio || tipo || !req.file) {
+    if (!nombre || !stock || !id_categoria || !precio || !tipo || !req.file) {
         return res.status(400).json({ msg: "Todos los campos son obligatorios" });
     }
 
     nombre = nombre.trim();
+    tipo = tipo.trim();
     stock = parseInt(stock.trim());
     precio = parseFloat(precio.trim());
-    tipo = tipo.trim();
 
     if (isNaN(stock) || stock < 0) {
         return res.status(400).json({ msg: "El stock debe ser un número entero mayor o igual a 0" });
