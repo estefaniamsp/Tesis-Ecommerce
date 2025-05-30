@@ -4,6 +4,7 @@ const router = Router()
 import {
     registerCliente,
     updateClienteProfile,
+    getClienteProfile,
     recuperarContrasenia,
     cambiarContrasenia,
     confirmEmail,
@@ -25,6 +26,7 @@ router.post("/registro", validarCliente, manejarErrores, registerCliente);
 router.put("/perfil", verificarAutenticacion, (req, res, next) => {req.folderName = "clientes";
     next();
 }, upload.single("imagen"), validarClientePerfil, manejarErrores, updateClienteProfile);
+router.get("/perfil", verificarAutenticacion, getClienteProfile);
 router.post("/recuperar-contrasenia", recuperarContrasenia);
 router.post("/cambiar-contrasenia", validarCambioContraseniaCliente, manejarErrores, cambiarContrasenia);
 router.get("/confirmarCliente/:token", confirmEmail);

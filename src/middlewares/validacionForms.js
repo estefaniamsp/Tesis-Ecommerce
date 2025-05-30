@@ -247,23 +247,32 @@ export const validarVenta = [
 
 export const validarCarrito = [
 
-    check("productos")
-        .isArray({ min: 1 })
-        .withMessage("Debe haber al menos un producto en el carrito.")
-        .notEmpty()
-        .withMessage('El campo "productos" es obligatorio'),
-
-    check("productos.*.producto_id")
+    check("producto_id")
         .isMongoId()
-        .withMessage("Cada producto debe tener un ID válido.")
+        .withMessage("El campo producto_id debe ser un ID válido.")
         .notEmpty()
-        .withMessage('El campo "producto_id" es obligatorio para cada producto'),
+        .withMessage("El campo producto_id es obligatorio"),
 
-    check("productos.*.cantidad")
+    check("cantidad")
         .isInt({ min: 1 })
-        .withMessage("La cantidad de cada producto debe ser un número entero mayor o igual a 1.")
+        .withMessage("La cantidad debe ser un número entero mayor o igual a 1.")
         .notEmpty()
-        .withMessage('El campo "cantidad" es obligatorio para cada producto'),
+        .withMessage("El campo cantidad es obligatorio"),
+];
+
+export const validarModificarCantidad = [
+    check("producto_id")
+        .notEmpty()
+        .withMessage("El campo producto_id es obligatorio.")
+        .isMongoId()
+        .withMessage("El producto_id debe ser un ID válido."),
+
+    check("cantidad")
+        .notEmpty()
+        .withMessage("El campo cantidad es obligatorio.")
+        .isInt()
+        .withMessage("La cantidad debe ser un número entero (positivo o negativo)."),
+
 ];
 
 // Validación para que solo el admin pueda cambiar o recuperar su contraseña
@@ -354,7 +363,7 @@ export const validarIngrediente = [
         .withMessage("El tipo debe tener entre 3 y 20 caracteres.")
         .isAlpha("es-ES", { ignore: "áéíóúÁÉÍÓÚñÑ " })
         .withMessage("El tipo solo debe contener letras."),
-        
+
     body("imagen")
         .custom((value, { req }) => {
             if (!req.file) {

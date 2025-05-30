@@ -14,12 +14,17 @@ async function recomendarProductoConHF(clienteId, tipo, id_categoria) {
   // Obtener todos los ingredientes disponibles para esa categoría
   const ingredientesDisponibles = await Ingrediente.find({ id_categoria: categoria._id });
 
-  // Si no hay ingredientes, no tiene sentido generar
   if (ingredientesDisponibles.length === 0) {
     throw new Error("No hay ingredientes registrados para esta categoría.");
   }
 
-  const nombresDisponibles = ingredientesDisponibles.map(i => i.nombre).join(', ');
+  // Agrupar ingredientes por tipo
+  const ingredientesAgrupados = ingredientesDisponibles.reduce((acc, ing) => {
+    const tipo = ing.tipo.toLowerCase();
+    if (!acc[tipo]) acc[tipo] = [];
+    acc[tipo].push(ing.nombre);
+    return acc;
+  }, {});
 
   const carritos = await Carritos.find({ cliente_id: clienteId, estado: "completado" })
     .populate({
@@ -33,44 +38,56 @@ async function recomendarProductoConHF(clienteId, tipo, id_categoria) {
 
   let prompt = "";
 
-  if (productosComprados.length > 0) {
-    const tiposIngredientes = [
-      ...new Set(productosComprados.flatMap(p => p.ingredientes.map(i => i.tipo)))
-    ];
+  const listaIngredientes = Object.entries(ingredientesAgrupados)
+    .map(([tipo, nombres]) => `${tipo}: ${nombres.join(', ')}`)
+    .join('\n');
 
+  if (productosComprados.length > 0) {
     prompt = `
 El cliente ha comprado productos de la categoría "${categoria.nombre}" y desea un nuevo producto del tipo "${tipo}".
 
-Ingredientes disponibles: ${nombresDisponibles}
+Ingredientes disponibles (agrupados por tipo):
+${listaIngredientes}
 
 Productos anteriores:
 ${productosComprados.map(p => `${p.nombre}: ${p.descripcion || "sin descripción"}`).join('\n')}
 
-Crea un producto personalizado. RESPONDE SOLO EN FORMATO JSON:
+Genera un producto personalizado en formato JSON:
 {
   "nombre": string,
   "categoria": string,
-  "ingredientes": array de strings (solo de los disponibles),
+  "ingredientes": {
+    "molde": string,
+    "esencia": string,
+    "colorante": string
+  },
   "beneficios": array de strings,
   "aroma": string
 }
-Solo el JSON, sin explicaciones. Máximo 150 tokens.
+
+ Solo responde el objeto JSON. Usa solo ingredientes disponibles. Máximo 150 tokens.
     `;
   } else {
     prompt = `
 El cliente desea un producto personalizado de tipo "${tipo}", categoría "${categoria.nombre}".
 
-Ingredientes disponibles: ${nombresDisponibles}
+Ingredientes disponibles (agrupados por tipo):
+${listaIngredientes}
 
-Crea un producto nuevo y útil. RESPONDE SOLO EN FORMATO JSON:
+Genera un producto creativo y útil en formato JSON:
 {
   "nombre": string,
   "categoria": string,
-  "ingredientes": array de strings (solo de los disponibles),
+  "ingredientes": {
+    "molde": string,
+    "esencia": string,
+    "colorante": string
+  },
   "beneficios": array de strings,
   "aroma": string
 }
-Solo responde el objeto JSON. Máximo 150 tokens.
+
+ Solo responde el objeto JSON. Usa solo ingredientes disponibles. Máximo 150 tokens.
     `;
   }
 
@@ -87,15 +104,21 @@ Solo responde el objeto JSON. Máximo 150 tokens.
   try {
     estructuraIA = JSON.parse(textoIA);
   } catch (e) {
-    console.warn("⚠️ La IA no respondió en formato JSON válido:", textoIA);
+    console.warn("La IA no respondió en formato JSON válido:", textoIA);
     return { texto: textoIA };
   }
 
-  // Match ingredientes por nombre (insensible a mayúsculas)
-  const nombresIA = estructuraIA.ingredientes.map(n => n.trim().toLowerCase());
+  // Match de ingredientes por tipo y nombre
+  const nombresIA = Object.entries(estructuraIA.ingredientes).map(
+    ([tipo, nombre]) => ({ tipo, nombre: nombre.trim().toLowerCase() })
+  );
 
   const ingredientesBD = ingredientesDisponibles.filter(ing =>
-    nombresIA.includes(ing.nombre.trim().toLowerCase())
+    nombresIA.some(
+      entrada =>
+        ing.tipo.toLowerCase() === entrada.tipo &&
+        ing.nombre.trim().toLowerCase() === entrada.nombre
+    )
   );
 
   const precioTotal = ingredientesBD.reduce((total, ing) => total + ing.precio, 0);

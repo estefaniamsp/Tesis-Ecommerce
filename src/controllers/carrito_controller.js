@@ -23,12 +23,12 @@ const getCarritoClienteController = async (req, res) => {
 };
 
 // Crear un carrito
-const setCarritoController = async (req, res) => {
-    const { productos } = req.body;
+const addCarritoController = async (req, res) => {
+    const { producto_id, cantidad } = req.body;
     const clienteId = req.clienteBDD._id.toString();
 
-    if (!productos || productos.length === 0) {
-        return res.status(400).json({ msg: `Debes agregar al menos un producto` });
+    if (!producto_id || typeof cantidad !== 'number' || cantidad <= 0) {
+        return res.status(400).json({ msg: "Producto o cantidad inválida." });
     }
 
     try {
@@ -37,33 +37,43 @@ const setCarritoController = async (req, res) => {
             return res.status(404).json({ msg: "Cliente no encontrado" });
         }
 
-        let totalCarrito = 0;
-        const productosConDetalles = [];
+        if (!mongoose.Types.ObjectId.isValid(producto_id.trim())) {
+            return res.status(400).json({ msg: `ID de producto inválido: ${producto_id}` });
+        }
 
-        for (const item of productos) {
-            const { producto_id, cantidad } = item;
+        const producto = await Producto.findById(producto_id.trim());
+        if (!producto) {
+            return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
+        }
 
-            if (!producto_id || typeof cantidad !== 'number' || cantidad <= 0) {
-                return res.status(400).json({ msg: `Producto o cantidad inválida en uno de los productos.` });
-            }
+        if (!producto.activo) {
+            return res.status(400).json({ msg: `El producto ${producto.nombre} está descontinuado.` });
+        }
 
-            if (typeof producto_id !== "string" || !mongoose.Types.ObjectId.isValid(producto_id.trim())) {
-                return res.status(400).json({ msg: `ID de producto inválido: ${producto_id}` });
-            }
+        if (cantidad > producto.stock) {
+            return res.status(400).json({
+                msg: `Solo hay ${producto.stock} unidades disponibles del producto ${producto.nombre}.`
+            });
+        }
 
-            const producto = await Producto.findById(producto_id.trim());
-            if (!producto) {
-                return res.status(404).json({ msg: `Producto con ID ${producto_id} no encontrado.` });
-            }
+        const subtotal = producto.precio * cantidad;
 
-            if (!producto.activo) {
-                return res.status(400).json({ msg: `El producto ${producto.nombre} está descontinuado y no puede ser añadido al carrito.` });
-            }
+        // Busca o crea carrito
+        let carrito = await Carrito.findOne({ cliente_id: clienteId });
+        if (!carrito) {
+            carrito = new Carrito({ cliente_id: clienteId, productos: [], total: 0, estado: "pendiente" });
+        }
 
-            const subtotal = producto.precio * cantidad;
-            totalCarrito += subtotal;
+        // Verifica si el producto ya está
+        const index = carrito.productos.findIndex(p => p.producto_id.toString() === producto._id.toString());
 
-            productosConDetalles.push({
+        if (index >= 0) {
+            // Ya existe: actualiza cantidad y subtotal
+            carrito.productos[index].cantidad += cantidad;
+            carrito.productos[index].subtotal += subtotal;
+        } else {
+            // No existe: añade nuevo
+            carrito.productos.push({
                 producto_id: producto._id,
                 cantidad,
                 precio_unitario: producto.precio,
@@ -71,45 +81,104 @@ const setCarritoController = async (req, res) => {
             });
         }
 
-        let carrito = await Carrito.findOne({ cliente_id: clienteId });
-        const mensaje = carrito ? "Carrito actualizado exitosamente" : "Carrito creado exitosamente";
-
-        if (!carrito) {
-            carrito = new Carrito({ cliente_id: clienteId });
-        }
-
-        carrito.productos = productosConDetalles;
-        carrito.total = totalCarrito;
-        carrito.estado = "pendiente";
-
+        // Recalcula total
+        carrito.total = carrito.productos.reduce((acc, p) => acc + p.subtotal, 0);
         await carrito.save();
 
-        // Actualizar disponibilidad
-        const productosConDisponibilidad = await Promise.all(
-            carrito.productos.map(async (p) => {
-                const producto = await Producto.findById(p.producto_id);
-                return {
-                    producto_id: p.producto_id,
-                    cantidad: p.cantidad,
-                    precio_unitario: p.precio_unitario,
-                    subtotal: p.subtotal,
-                    disponible: producto ? producto.stock >= p.cantidad : false
-                };
-            })
-        );
+        res.status(200).json({ msg: "Producto agregado al carrito", carrito });
+    } catch (error) {
+        console.error("Error al agregar producto al carrito:", error);
+        res.status(500).json({ msg: "Error interno del servidor" });
+    }
+};
 
-        const carritoFinal = {
-            ...carrito._doc,
-            productos: productosConDisponibilidad
-        };
+const updateCantidadProductoController = async (req, res) => {
+    const { producto_id, cantidad } = req.body; // cantidad puede ser positiva o negativa
+    const clienteId = req.clienteBDD._id.toString();
 
-        res.status(201).json({
-            msg: mensaje,
-            carrito: carritoFinal
-        });
+    if (!producto_id || typeof cantidad !== 'number') {
+        return res.status(400).json({ msg: "Datos inválidos: producto_id y cantidad son requeridos." });
+    }
+
+    try {
+        const carrito = await Carrito.findOne({ cliente_id: clienteId });
+        if (!carrito) {
+            return res.status(404).json({ msg: "Carrito no encontrado." });
+        }
+
+        const index = carrito.productos.findIndex(p => p.producto_id.toString() === producto_id);
+        if (index === -1) {
+            return res.status(404).json({ msg: "Producto no encontrado en el carrito." });
+        }
+
+        const producto = await Producto.findById(producto_id);
+        if (!producto) {
+            return res.status(404).json({ msg: "Producto no existe en la base de datos." });
+        }
+
+        if (cantidad < 0 && Math.abs(cantidad) > carrito.productos[index].cantidad) {
+            return res.status(400).json({
+                msg: `No puedes restar más de lo que tienes en el carrito. Actualmente tienes ${carrito.productos[index].cantidad} unidades de ${producto.nombre}.`
+            });
+        }
+
+        const nuevaCantidad = carrito.productos[index].cantidad + cantidad;
+
+        if (nuevaCantidad > producto.stock) {
+            return res.status(400).json({
+                msg: `No puedes agregar más de ${producto.stock} unidades de ${producto.nombre}.`
+            });
+        }
+
+        let mensaje = "";
+
+        if (nuevaCantidad <= 0) {
+            carrito.productos.splice(index, 1);
+            mensaje = `Producto eliminado del carrito: ${producto.nombre}`;
+        } else {
+            carrito.productos[index].cantidad = nuevaCantidad;
+            carrito.productos[index].subtotal = nuevaCantidad * producto.precio;
+            mensaje = `Cantidad actualizada para el producto: ${producto.nombre}`;
+        }
+
+        // Recalcular total del carrito
+        carrito.total = carrito.productos.reduce((acc, p) => acc + p.subtotal, 0);
+        await carrito.save();
+
+        res.status(200).json({ msg: mensaje, carrito });
 
     } catch (error) {
-        console.error("Error al crear/actualizar carrito:", error);
+        console.error("Error al modificar cantidad:", error);
+        res.status(500).json({ msg: "Error interno del servidor" });
+    }
+};
+
+const removeProductoCarritoController = async (req, res) => {
+    const { producto_id } = req.body;
+    const clienteId = req.clienteBDD._id.toString();
+
+    if (!producto_id || !mongoose.Types.ObjectId.isValid(producto_id.trim())) {
+        return res.status(400).json({ msg: "ID de producto inválido." });
+    }
+
+    try {
+        const carrito = await Carrito.findOne({ cliente_id: clienteId });
+        if (!carrito) {
+            return res.status(404).json({ msg: "Carrito no encontrado." });
+        }
+
+        // Filtra productos para eliminar el que coincide
+        carrito.productos = carrito.productos.filter(
+            (p) => p.producto_id.toString() !== producto_id
+        );
+
+        // Recalcula el total
+        carrito.total = carrito.productos.reduce((acc, p) => acc + p.subtotal, 0);
+        await carrito.save();
+
+        res.status(200).json({ msg: "Producto eliminado del carrito", carrito });
+    } catch (error) {
+        console.error("Error al eliminar producto del carrito:", error);
         res.status(500).json({ msg: "Error interno del servidor" });
     }
 };
@@ -145,6 +214,8 @@ const emptyCarritoController = async (req, res) => {
 
 export {
     getCarritoClienteController,
-    setCarritoController,
+    addCarritoController,
+    updateCantidadProductoController,
+    removeProductoCarritoController,
     emptyCarritoController
 };

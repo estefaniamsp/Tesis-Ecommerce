@@ -203,7 +203,7 @@ const loginCliente = async (req, res) => {
       email: ClienteBDD.email,
       _id,
     });
-    
+
   } catch (error) {
     console.error("Error en loginCliente:", error.message);
     res.status(500).json({ msg: "Error interno del servidor" });
@@ -318,6 +318,37 @@ const updateClienteProfile = async (req, res) => {
     if (!res.headersSent) {
       res.status(500).json({ msg: "Error del servidor al actualizar el perfil" });
     }
+  }
+};
+
+// Obtener perfil de cliente
+const getClienteProfile = async (req, res) => {
+  try {
+    const clienteId = req.clienteBDD._id.toString();
+
+    const cliente = await Clientes.findById(clienteId);
+    if (!cliente) {
+      return res.status(404).json({ msg: "Cliente no encontrado" });
+    }
+
+    return res.status(200).json({
+      msg: "Perfil obtenido correctamente",
+      cliente: {
+        cedula: cliente.cedula,
+        nombre: cliente.nombre,
+        apellido: cliente.apellido,
+        genero: cliente.genero,
+        email: cliente.email,
+        direccion: cliente.direccion,
+        telefono: cliente.telefono,
+        fecha_nacimiento: cliente.fecha_nacimiento,
+        imagen: cliente.imagen
+      }
+    });
+
+  } catch (error) {
+    console.error("Error al obtener perfil:", error);
+    res.status(500).json({ msg: "Error del servidor al obtener el perfil" });
   }
 };
 
@@ -571,6 +602,7 @@ export {
   registerCliente,
   loginCliente,
   updateClienteProfile,
+  getClienteProfile,
   recuperarContrasenia,
   cambiarContrasenia,
   confirmEmail,
