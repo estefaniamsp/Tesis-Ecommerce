@@ -113,7 +113,7 @@ Genera un producto creativo y útil en formato JSON:
     ([tipo, nombre]) => ({ tipo, nombre: nombre.trim().toLowerCase() })
   );
 
-  const ingredientesBD = ingredientesDisponibles.filter(ing =>
+  let ingredientesBD = ingredientesDisponibles.filter(ing =>
     nombresIA.some(
       entrada =>
         ing.tipo.toLowerCase() === entrada.tipo &&
@@ -121,14 +121,31 @@ Genera un producto creativo y útil en formato JSON:
     )
   );
 
+  // Asegurar que siempre haya molde, esencia y colorante
+  const tiposRequeridos = ["molde", "esencia", "colorante"];
+
+  for (const tipo of tiposRequeridos) {
+    const yaIncluido = ingredientesBD.some(ing => ing.tipo.toLowerCase() === tipo);
+    if (!yaIncluido) {
+      const opciones = ingredientesDisponibles.filter(ing => ing.tipo.toLowerCase() === tipo);
+      if (opciones.length > 0) {
+        const random = opciones[Math.floor(Math.random() * opciones.length)];
+        ingredientesBD.push(random);
+      }
+    }
+  }
+
   const precioTotal = ingredientesBD.reduce((total, ing) => total + ing.precio, 0);
 
   return {
     ...estructuraIA,
-    ingredientes: ingredientesBD,
+    ingredientes: ingredientesBD.map(ing => {
+      const { stock, createdAt, updatedAt, __v, ...resto } = ing.toObject();
+      return resto;
+    }),
     precio: precioTotal,
     ...(ingredientesBD.length === 0 && {
-      advertencia: "⚠️ Ninguno de los ingredientes generados por la IA coincidió con los disponibles."
+      advertencia: "Ninguno de los ingredientes generados por la IA coincidió con los disponibles."
     })
   };
 }

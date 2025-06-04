@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { 
     getAllVentasController, 
     getVentaByIDController, 
-    createVentaCliente, 
+    /*createVentaCliente, */
     updateVentaController,
     deleteVentaController,
     getVentasClienteController,
@@ -16,7 +16,7 @@ import verificarAutenticacion from '../middlewares/auth.js';
 const router = Router();
 
 // Rutas para obtener las ventas de un cliente específico
-router.post('/ventas', verificarAutenticacion, validarVenta, manejarErrores, createVentaCliente);
+/*router.post('/ventas', verificarAutenticacion, validarVenta, manejarErrores, createVentaCliente);*/
 router.get('/ventas/cliente/mis-ventas', verificarAutenticacion, getVentasClienteController);
 router.get('/ventas/cliente/factura/:id', verificarAutenticacion, getFacturaClienteById);
 

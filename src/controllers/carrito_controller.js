@@ -1,7 +1,10 @@
 import Carrito from "../models/carritos.js";
 import Clientes from "../models/clientes.js";
 import Producto from "../models/productos.js";
+import Ventas from "../models/ventas.js";
 import mongoose from "mongoose";
+import { Stripe } from "stripe";
+const stripe = new Stripe(process.env.STRIPE_PRIVATE_KEY);
 
 // Obtener todos los carritos
 const getCarritoClienteController = async (req, res) => {
@@ -9,7 +12,14 @@ const getCarritoClienteController = async (req, res) => {
         const clienteId = req.clienteBDD._id;
 
         const carrito = await Carrito.findOne({ cliente_id: clienteId })
-            .populate('productos.producto_id');
+            .populate({
+                path: 'productos.producto_id',
+                populate: {
+                    path: 'ingredientes',
+                    model: 'Ingredientes',
+                    select: 'nombre'
+                }
+            });
 
         if (!carrito) {
             return res.status(404).json({ msg: "No tienes un carrito asociado aún" });
@@ -56,23 +66,21 @@ const addCarritoController = async (req, res) => {
             });
         }
 
-        const subtotal = producto.precio * cantidad;
+        const carrito = await Carrito.findOne({ cliente_id: clienteId, estado: "pendiente" });
 
-        // Busca o crea carrito
-        let carrito = await Carrito.findOne({ cliente_id: clienteId });
         if (!carrito) {
-            carrito = new Carrito({ cliente_id: clienteId, productos: [], total: 0, estado: "pendiente" });
+            return res.status(400).json({ msg: "No tienes un carrito pendiente disponible. No se puede agregar productos." });
         }
+
+        const subtotal = producto.precio * cantidad;
 
         // Verifica si el producto ya está
         const index = carrito.productos.findIndex(p => p.producto_id.toString() === producto._id.toString());
 
         if (index >= 0) {
-            // Ya existe: actualiza cantidad y subtotal
             carrito.productos[index].cantidad += cantidad;
             carrito.productos[index].subtotal += subtotal;
         } else {
-            // No existe: añade nuevo
             carrito.productos.push({
                 producto_id: producto._id,
                 cantidad,
@@ -81,7 +89,6 @@ const addCarritoController = async (req, res) => {
             });
         }
 
-        // Recalcula total
         carrito.total = carrito.productos.reduce((acc, p) => acc + p.subtotal, 0);
         await carrito.save();
 
@@ -212,10 +219,125 @@ const emptyCarritoController = async (req, res) => {
     }
 };
 
+const pagarCarritoController = async (req, res) => {
+    const clienteId = req.clienteBDD._id.toString();
+    const { paymentMethodId } = req.body;
+
+    if (!paymentMethodId) {
+        return res.status(400).json({ msg: "paymentMethodId es requerido" });
+    }
+
+    try {
+        // Actualización atómica: solo permite continuar si el estado es 'pendiente'
+        const carrito = await Carrito.findOneAndUpdate(
+            { cliente_id: clienteId, estado: "pendiente" },
+            { estado: "procesando" }, // estado temporal para bloquear concurrencia
+            { new: true }
+        ).populate("productos.producto_id");
+
+        if (!carrito) {
+            return res.status(400).json({ msg: "No se puede procesar el pago. El carrito ya fue pagado o no existe." });
+        }
+
+        if (carrito.productos.length === 0 || carrito.total <= 0) {
+            carrito.estado = "pendiente";
+            await carrito.save();
+            return res.status(400).json({ msg: "No puedes pagar un carrito vacío" });
+        }
+
+        const cliente = await Clientes.findById(clienteId);
+
+        // Buscar o crear cliente en Stripe
+        let [stripeCliente] = (await stripe.customers.list({ email: cliente.email, limit: 1 })).data || [];
+
+        if (!stripeCliente) {
+            stripeCliente = await stripe.customers.create({
+                name: `${cliente.nombre} ${cliente.apellido}`,
+                email: cliente.email,
+            });
+        }
+
+        const payment = await stripe.paymentIntents.create({
+            amount: Math.round(carrito.total * 100),
+            currency: "USD",
+            description: `Pago del carrito del cliente ${cliente.nombre}`,
+            payment_method: paymentMethodId,
+            confirm: true,
+            customer: stripeCliente.id,
+            automatic_payment_methods: {
+                enabled: true,
+                allow_redirects: "never"
+            }
+        });
+
+        if (payment.status !== "succeeded") {
+            carrito.estado = "pendiente"; // restaurar estado si falló
+            await carrito.save();
+            return res.status(400).json({ msg: "El pago no fue exitoso", estado: payment.status });
+        }
+
+        // Registrar la venta en la base de datos
+        let totalVenta = 0;
+        const productosConDetalles = [];
+
+        for (const item of carrito.productos) {
+            const producto = await Producto.findById(item.producto_id._id);
+
+            if (!producto || !producto.activo) {
+                carrito.estado = "pendiente";
+                await carrito.save();
+                return res.status(400).json({ msg: `El producto ${item.producto_id.nombre} ya no está disponible.` });
+            }
+
+            if (producto.stock < item.cantidad) {
+                carrito.estado = "pendiente";
+                await carrito.save();
+                return res.status(400).json({ msg: `Stock insuficiente para ${producto.nombre}` });
+            }
+
+            producto.stock -= item.cantidad;
+            await producto.save();
+
+            productosConDetalles.push({
+                producto_id: producto._id,
+                cantidad: item.cantidad,
+                subtotal: item.subtotal,
+            });
+
+            totalVenta += item.subtotal;
+        }
+
+        const nuevaVenta = new Ventas({
+            cliente_id: cliente._id,
+            productos: productosConDetalles,
+            total: totalVenta,
+            estado: "finalizado"
+        });
+
+        await nuevaVenta.save();
+
+        // Marcar carrito como pagado y vaciarlo
+        carrito.productos = [];
+        carrito.total = 0;
+        carrito.estado = "pendiente"; // reinicia el estado para seguir usando el mismo carrito
+        await carrito.save();
+
+        return res.status(200).json({
+            msg: "Pago exitoso. Venta registrada correctamente.",
+            venta: nuevaVenta
+        });
+
+    } catch (error) {
+        console.error("Error al pagar el carrito:", error);
+        return res.status(500).json({ msg: "Error al procesar el pago", error: error.message });
+    }
+};
+
 export {
     getCarritoClienteController,
     addCarritoController,
     updateCantidadProductoController,
     removeProductoCarritoController,
-    emptyCarritoController
+    emptyCarritoController,
+    pagarCarritoController
 };

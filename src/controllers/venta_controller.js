@@ -76,7 +76,7 @@ const getVentaByIDController = async (req, res) => {
 };
 
 // Crear una nueva venta
-const createVentaCliente = async (req, res) => {
+/*const createVentaCliente = async (req, res) => {
   const { productos } = req.body;
   const clienteId = req.clienteBDD._id.toString();
 
@@ -166,7 +166,7 @@ const createVentaCliente = async (req, res) => {
     console.error("Error al crear venta:", error);
     res.status(500).json({ msg: "Error interno del servidor" });
   }
-};
+};*/
 
 // Actualizar el estado de una venta
 const updateVentaController = async (req, res) => {
@@ -424,7 +424,7 @@ const getDashboardController = async (req, res) => {
 export {
   getAllVentasController,
   getVentaByIDController,
-  createVentaCliente,
+  /*createVentaCliente,*/
   updateVentaController,
   deleteVentaController,
   getVentasClienteController,

@@ -38,7 +38,7 @@ const carritoSchema = new mongoose.Schema({
     },
     estado: {
         type: String,
-        enum: ['pendiente', 'finalizado'],
+        enum: ['pendiente', 'pagado'],
         default: 'pendiente'
     },
 },

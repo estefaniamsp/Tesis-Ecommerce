@@ -4,7 +4,8 @@ import {
     addCarritoController,
     updateCantidadProductoController,
     removeProductoCarritoController,
-    emptyCarritoController 
+    emptyCarritoController,
+    pagarCarritoController
 } from '../controllers/carrito_controller.js';
 import verificarAutenticacion from '../middlewares/auth.js'; 
 import { validarCarrito, validarModificarCantidad, manejarErrores } from '../middlewares/validacionForms.js';
@@ -16,5 +17,6 @@ router.put('/carritos/agregar', verificarAutenticacion, validarCarrito, manejarE
 router.put('/carritos/modificar-cantidad', verificarAutenticacion, validarModificarCantidad, manejarErrores, updateCantidadProductoController);
 router.put('/carritos/eliminar', verificarAutenticacion, removeProductoCarritoController);
 router.delete('/carritos', verificarAutenticacion, emptyCarritoController);
+router.post('/carritos/pagar', verificarAutenticacion, pagarCarritoController);
 
 export default router;
