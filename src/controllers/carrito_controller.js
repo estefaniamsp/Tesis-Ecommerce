@@ -72,8 +72,7 @@ const addCarritoController = async (req, res) => {
             return res.status(400).json({ msg: "No tienes un carrito pendiente disponible. No se puede agregar productos." });
         }
 
-        const subtotal = producto.precio * cantidad;
-
+        const subtotal = Math.round(producto.precio * cantidad * 100) / 100;
         // Verifica si el producto ya está
         const index = carrito.productos.findIndex(p => p.producto_id.toString() === producto._id.toString());
 
@@ -89,10 +88,18 @@ const addCarritoController = async (req, res) => {
             });
         }
 
-        carrito.total = carrito.productos.reduce((acc, p) => acc + p.subtotal, 0);
+        const totalCalculado = carrito.productos.reduce((acc, p) => acc + p.subtotal, 0);
+        carrito.total = Math.round(totalCalculado * 100) / 100;
         await carrito.save();
 
-        res.status(200).json({ msg: "Producto agregado al carrito", carrito });
+        // ⚠️ Poblamos para devolver información completa del producto
+        const carritoActualizado = await Carrito.findById(carrito._id)
+            .populate({
+                path: 'productos.producto_id',
+                select: 'nombre imagen precio'
+            });
+
+        res.status(200).json({ msg: "Producto agregado al carrito", carrito: carritoActualizado });
     } catch (error) {
         console.error("Error al agregar producto al carrito:", error);
         res.status(500).json({ msg: "Error interno del servidor" });
@@ -143,13 +150,16 @@ const updateCantidadProductoController = async (req, res) => {
             carrito.productos.splice(index, 1);
             mensaje = `Producto eliminado del carrito: ${producto.nombre}`;
         } else {
+            const subtotal = Math.round(producto.precio * nuevaCantidad * 100) / 100;
             carrito.productos[index].cantidad = nuevaCantidad;
-            carrito.productos[index].subtotal = nuevaCantidad * producto.precio;
+            carrito.productos[index].subtotal = subtotal;
             mensaje = `Cantidad actualizada para el producto: ${producto.nombre}`;
         }
 
-        // Recalcular total del carrito
-        carrito.total = carrito.productos.reduce((acc, p) => acc + p.subtotal, 0);
+        // Recalcular total del carrito con redondeo
+        const totalCalculado = carrito.productos.reduce((acc, p) => acc + p.subtotal, 0);
+        carrito.total = Math.round(totalCalculado * 100) / 100;
+
         await carrito.save();
 
         res.status(200).json({ msg: mensaje, carrito });
@@ -180,7 +190,8 @@ const removeProductoCarritoController = async (req, res) => {
         );
 
         // Recalcula el total
-        carrito.total = carrito.productos.reduce((acc, p) => acc + p.subtotal, 0);
+        const totalCalculado = carrito.productos.reduce((acc, p) => acc + p.subtotal, 0);
+        carrito.total = parseFloat(totalCalculado.toFixed(2));
         await carrito.save();
 
         res.status(200).json({ msg: "Producto eliminado del carrito", carrito });
