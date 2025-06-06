@@ -239,10 +239,10 @@ const pagarCarritoController = async (req, res) => {
     }
 
     try {
-        // Actualización atómica: solo permite continuar si el estado es 'pendiente'
+        
         const carrito = await Carrito.findOneAndUpdate(
             { cliente_id: clienteId, estado: "pendiente" },
-            { estado: "procesando" }, // estado temporal para bloquear concurrencia
+            { estado: "procesando" }, 
             { new: true }
         ).populate("productos.producto_id");
 
@@ -258,7 +258,6 @@ const pagarCarritoController = async (req, res) => {
 
         const cliente = await Clientes.findById(clienteId);
 
-        // Buscar o crear cliente en Stripe
         let [stripeCliente] = (await stripe.customers.list({ email: cliente.email, limit: 1 })).data || [];
 
         if (!stripeCliente) {
@@ -282,12 +281,11 @@ const pagarCarritoController = async (req, res) => {
         });
 
         if (payment.status !== "succeeded") {
-            carrito.estado = "pendiente"; // restaurar estado si falló
+            carrito.estado = "pendiente"; 
             await carrito.save();
             return res.status(400).json({ msg: "El pago no fue exitoso", estado: payment.status });
         }
 
-        // Registrar la venta en la base de datos
         let totalVenta = 0;
         const productosConDetalles = [];
 
@@ -327,10 +325,9 @@ const pagarCarritoController = async (req, res) => {
 
         await nuevaVenta.save();
 
-        // Marcar carrito como pagado y vaciarlo
         carrito.productos = [];
         carrito.total = 0;
-        carrito.estado = "pendiente"; // reinicia el estado para seguir usando el mismo carrito
+        carrito.estado = "pendiente"; 
         await carrito.save();
 
         return res.status(200).json({

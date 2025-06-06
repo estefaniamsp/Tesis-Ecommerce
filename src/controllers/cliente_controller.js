@@ -227,50 +227,52 @@ const updateClienteProfile = async (req, res) => {
       fecha_nacimiento: body.fecha_nacimiento?.trim()
     };
 
+    const esValorValido = (valor) =>
+      typeof valor === "string" && valor.trim() !== "";
+
     const cliente = await Clientes.findById(clienteId);
     if (!cliente) {
       return res.status(404).json({ msg: "Cliente no encontrado" });
     }
 
-    // Verificar si el perfil está incompleto y se intenta editar individualmente
-    const camposObligatorios = ["nombre", "apellido", "genero", "cedula", "telefono", "fecha_nacimiento"];
-    const faltantes = camposObligatorios.filter(campo => !cliente[campo] && !campos[campo]);
+    // ⛔️ Validar que al menos un campo válido fue enviado
+    const camposValidos = Object.entries(campos).filter(
+      ([, value]) => esValorValido(value)
+    );
 
-    if (faltantes.length > 0) {
+    if (camposValidos.length === 0 && !req.file) {
       return res.status(400).json({
-        msg: "Debes completar tu perfil antes de editar individualmente.",
-        campos_obligatorios: faltantes
+        msg: "No se envió ningún campo válido para actualizar."
       });
     }
 
-    // Validaciones de formato
     const regexNombre = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
-    if (campos.nombre && !regexNombre.test(campos.nombre)) {
+    if (esValorValido(campos.nombre) && !regexNombre.test(campos.nombre)) {
       return res.status(400).json({ msg: "El nombre solo debe contener letras" });
     }
-    if (campos.apellido && !regexNombre.test(campos.apellido)) {
+    if (esValorValido(campos.apellido) && !regexNombre.test(campos.apellido)) {
       return res.status(400).json({ msg: "El apellido solo debe contener letras" });
     }
-    if (campos.genero && !["masculino", "femenino"].includes(campos.genero)) {
+    if (esValorValido(campos.genero) && !["masculino", "femenino"].includes(campos.genero)) {
       return res.status(400).json({ msg: "El género debe ser 'masculino' o 'femenino'" });
     }
     const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (campos.email && !regexEmail.test(campos.email)) {
+    if (esValorValido(campos.email) && !regexEmail.test(campos.email)) {
       return res.status(400).json({ msg: "El correo ingresado no es válido" });
     }
-    if (campos.telefono && !/^\d{10}$/.test(campos.telefono)) {
+    if (esValorValido(campos.telefono) && !/^\d{10}$/.test(campos.telefono)) {
       return res.status(400).json({ msg: "El teléfono debe tener exactamente 10 números" });
     }
-    if (campos.cedula && !/^\d{10}$/.test(campos.cedula)) {
+    if (esValorValido(campos.cedula) && !/^\d{10}$/.test(campos.cedula)) {
       return res.status(400).json({ msg: "La cédula debe tener exactamente 10 números" });
     }
-    if (campos.fecha_nacimiento && !/^\d{4}-\d{2}-\d{2}$/.test(campos.fecha_nacimiento)) {
+    if (esValorValido(campos.fecha_nacimiento) && !/^\d{4}-\d{2}-\d{2}$/.test(campos.fecha_nacimiento)) {
       return res.status(400).json({ msg: "La fecha de nacimiento debe tener el formato YYYY-MM-DD" });
     }
 
     // Verificar duplicados
-    for (const [campo, valor] of Object.entries(campos)) {
-      if (valor && valor !== cliente[campo]) {
+    for (const [campo, valor] of camposValidos) {
+      if (valor !== cliente[campo]) {
         const existe = await Clientes.findOne({ [campo]: valor });
         if (existe && existe._id.toString() !== clienteId) {
           return res.status(400).json({ msg: `El ${campo} ya está registrado por otro cliente` });
@@ -278,9 +280,9 @@ const updateClienteProfile = async (req, res) => {
       }
     }
 
-    // Actualizar solo los campos recibidos
-    Object.entries(campos).forEach(([key, value]) => {
-      if (value !== undefined) cliente[key] = value;
+    // Actualizar solo campos válidos
+    camposValidos.forEach(([key, value]) => {
+      cliente[key] = value;
     });
 
     // Procesar imagen si se sube
