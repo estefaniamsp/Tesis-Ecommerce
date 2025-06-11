@@ -10,32 +10,38 @@ const getAllProductosController = async (req, res) => {
     // Extraer y convertir los parámetros de consulta
     let page = parseInt(req.query.page, 10) || 1;
     let limit = parseInt(req.query.limit, 10) || 10;
+    const { nombre, tipo } = req.query;
 
-    // Validar que 'page' y 'limit' sean números enteros positivos
     if (page < 1) page = 1;
     if (limit < 1) limit = 10;
 
     const skip = (page - 1) * limit;
 
-    // Obtener los productos con paginación y población de la categoría
-    const productos = await Producto.find({ activo: true })
+    // Construir filtro dinámico
+    const filtro = { activo: true };
+
+    if (nombre) {
+      filtro.nombre = { $regex: nombre, $options: 'i' }; // búsqueda parcial insensible a mayúsculas
+    }
+
+    if (tipo) {
+      filtro.tipo = tipo; // coincidencia exacta
+    }
+
+    // Consulta con filtros y paginación
+    const productos = await Producto.find(filtro)
       .populate('id_categoria')
       .populate('ingredientes')
       .skip(skip)
       .limit(limit);
 
-    // Contar el total de productos
-    const totalProductos = await Producto.countDocuments({ activo: true });
-
-    // Calcular el total de páginas
+    const totalProductos = await Producto.countDocuments(filtro);
     const totalPaginas = Math.ceil(totalProductos / limit);
 
-    // Verificar si se encontraron productos
     if (productos.length === 0) {
       return res.status(404).json({ msg: "No se encontraron productos" });
     }
 
-    // Responder con los productos y la información de paginación
     return res.status(200).json({
       totalProductos,
       totalPaginas,

@@ -252,10 +252,9 @@ const pagarCarritoController = async (req, res) => {
         if (carrito.productos.length === 0 || carrito.total <= 0) {
             carrito.estado = "pendiente";
             await carrito.save();
-            return res.status(400).json({ msg: "No puedes pagar un carrito vacío" });
+            return res.status(400).json({ msg: "No puedes pagar un carrito vacío." });
         }
 
-        // Validar monto mínimo requerido por Stripe (USD 0.50)
         if (carrito.total < 0.5) {
             carrito.estado = "pendiente";
             await carrito.save();
@@ -273,83 +272,106 @@ const pagarCarritoController = async (req, res) => {
             });
         }
 
-        const payment = await stripe.paymentIntents.create({
-            amount: Math.round(carrito.total * 100),
-            currency: "USD",
-            description: `Pago del carrito del cliente ${cliente.nombre}`,
-            payment_method: paymentMethodId,
-            confirm: true,
-            customer: stripeCliente.id,
-            automatic_payment_methods: {
-                enabled: true,
-                allow_redirects: "never"
-            }
-        });
+        let nuevaVenta = null;
 
-        if (payment.status !== "succeeded") {
+        try {
+            const payment = await stripe.paymentIntents.create({
+                amount: Math.round(carrito.total * 100),
+                currency: "USD",
+                description: `Pago del carrito del cliente ${cliente.nombre}`,
+                payment_method: paymentMethodId,
+                confirm: true,
+                customer: stripeCliente.id,
+                automatic_payment_methods: {
+                    enabled: true,
+                    allow_redirects: "never"
+                }
+            });
+
+            if (payment.status !== "succeeded") {
+                throw new Error("El pago no fue exitoso");
+            }
+
+            // Procesar productos
+            let totalVenta = 0;
+            const productosConDetalles = [];
+
+            for (const item of carrito.productos) {
+                const producto = await Producto.findById(item.producto_id._id);
+
+                if (!producto || !producto.activo) {
+                    throw new Error(`El producto ${item.producto_id.nombre} ya no está disponible.`);
+                }
+
+                if (producto.stock < item.cantidad) {
+                    throw new Error(`Stock insuficiente para ${producto.nombre}`);
+                }
+
+                producto.stock -= item.cantidad;
+                await producto.save();
+
+                productosConDetalles.push({
+                    producto_id: producto._id,
+                    cantidad: item.cantidad,
+                    subtotal: item.subtotal,
+                });
+
+                totalVenta += item.subtotal;
+            }
+
+            // Registrar venta
+            nuevaVenta = new Ventas({
+                cliente_id: cliente._id,
+                productos: productosConDetalles,
+                total: totalVenta,
+                estado: "finalizado"
+            });
+
+            await nuevaVenta.save();
+
+            // Limpiar carrito
+            carrito.productos = [];
+            carrito.total = 0;
             carrito.estado = "pendiente";
             await carrito.save();
-            return res.status(400).json({ msg: "El pago no fue exitoso", estado: payment.status });
-        }
 
-        let totalVenta = 0;
-        const productosConDetalles = [];
+            // Reembolso en modo prueba
+            if (isTest === true) {
+                if (totalVenta === 0.5) {
+                    await stripe.refunds.create({
+                        payment_intent: payment.id,
+                        reason: "requested_by_customer"
+                    });
+                } else if (totalVenta > 0.5) {
+                    const estimadoComision = totalVenta * 0.029 + 0.30;
+                    const montoAReembolsar = totalVenta - estimadoComision;
 
-        for (const item of carrito.productos) {
-            const producto = await Producto.findById(item.producto_id._id);
-
-            if (!producto || !producto.activo) {
-                carrito.estado = "pendiente";
-                await carrito.save();
-                return res.status(400).json({ msg: `El producto ${item.producto_id.nombre} ya no está disponible.` });
+                    if (montoAReembolsar > 0) {
+                        await stripe.refunds.create({
+                            payment_intent: payment.id,
+                            amount: Math.round(montoAReembolsar * 100),
+                            reason: "requested_by_customer"
+                        });
+                    }
+                }
             }
 
-            if (producto.stock < item.cantidad) {
-                carrito.estado = "pendiente";
-                await carrito.save();
-                return res.status(400).json({ msg: `Stock insuficiente para ${producto.nombre}` });
-            }
-
-            producto.stock -= item.cantidad;
-            await producto.save();
-
-            productosConDetalles.push({
-                producto_id: producto._id,
-                cantidad: item.cantidad,
-                subtotal: item.subtotal,
+            return res.status(200).json({
+                msg: isTest
+                    ? "Pago en modo prueba. Se aplicó reembolso automático."
+                    : "Pago exitoso. Venta registrada correctamente.",
+                venta: nuevaVenta
             });
 
-            totalVenta += item.subtotal;
-        }
+        } catch (pagoError) {
+            carrito.estado = "pendiente";
+            await carrito.save();
 
-        const nuevaVenta = new Ventas({
-            cliente_id: cliente._id,
-            productos: productosConDetalles,
-            total: totalVenta,
-            estado: "finalizado"
-        });
-
-        await nuevaVenta.save();
-
-        carrito.productos = [];
-        carrito.total = 0;
-        carrito.estado = "pendiente";
-        await carrito.save();
-
-        // 🟨 Reembolso automático si es prueba (isTest === true y monto bajo)
-        if (totalVenta <= 0.5 && isTest === true) {
-            await stripe.refunds.create({
-                payment_intent: payment.id,
-                reason: "requested_by_customer",
+            return res.status(400).json({
+                msg: "El pago no pudo completarse. El carrito fue restaurado.",
+                error: pagoError.message
             });
         }
-
-        return res.status(200).json({
-            msg: totalVenta <= 0.5 && isTest === true
-                ? "Pago exitoso y devuelto automáticamente (modo prueba)."
-                : "Pago exitoso. Venta registrada correctamente.",
-            venta: nuevaVenta
-        });
 
     } catch (error) {
         console.error("Error al pagar el carrito:", error);
