@@ -21,11 +21,11 @@ const getAllProductosController = async (req, res) => {
     const filtro = { activo: true };
 
     if (nombre) {
-      filtro.nombre = { $regex: nombre, $options: 'i' }; // búsqueda parcial insensible a mayúsculas
+      filtro.nombre = { $regex: nombre, $options: 'i' }; 
     }
 
     if (tipo) {
-      filtro.tipo = tipo; // coincidencia exacta
+      filtro.tipo = { $regex: tipo, $options: 'i' }; 
     }
 
     // Consulta con filtros y paginación
