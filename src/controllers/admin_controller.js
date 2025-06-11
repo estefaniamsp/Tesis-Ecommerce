@@ -5,8 +5,8 @@ import nodemailer from "nodemailer";
 import { sendMailToUserAdmin } from "../config/nodemailer.js";
 
 const createAdmin = async () => {
-    const email = "estefi2000ms2@gmail.com";
-    const password = "admin1234";
+    const email = "admin123@yopmail.com";
+    const password = "NuevaPass123$";
 
     // Verificar que no haya campos vacíos
     if (!email || !password) {
@@ -52,26 +52,44 @@ const confirmEmail = async (req, res) => {
     const { token } = req.params;
 
     if (!token) {
-        return res.status(400).json({ msg: "Token no proporcionado" });
+        return res.status(400).send(`
+      <div style="font-family: Arial; text-align: center; padding: 50px;">
+        <h2 style="color: #e67e22;">Token no proporcionado</h2>
+        <p>Por favor verifica el enlace o solicita uno nuevo.</p>
+      </div>
+    `);
     }
 
     try {
-        // Verificar que el token corresponde a un admin válido
         const admin = await Admin.findOne({ token });
 
         if (!admin) {
-            return res.status(404).json({ msg: "Token inválido o expirado" });
+            return res.status(404).send(`
+        <div style="font-family: Arial; text-align: center; padding: 50px;">
+          <h2 style="color: #c0392b;">Token inválido o expirado</h2>
+          <p>Por favor solicita uno nuevo.</p>
+        </div>
+      `);
         }
 
-        // Confirmar el correo del admin
         admin.confirmEmail = true;
-        admin.token = null; // Limpiar el token después de la confirmación
+        admin.token = null;
         await admin.save();
 
-        res.status(200).json({ msg: "Correo confirmado exitosamente" });
+        return res.status(200).send(`
+      <div style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+        <h2 style="color: #27ae60;">¡Correo de administrador confirmado exitosamente!</h2>
+        <p>Puedes cerrar esta ventana y continuar usando la aplicación.</p>
+      </div>
+    `);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ msg: "Error al confirmar el correo" });
+        return res.status(500).send(`
+      <div style="font-family: Arial; text-align: center; padding: 50px;">
+        <h2 style="color: #e74c3c;">Error al confirmar el correo</h2>
+        <p>Intenta nuevamente más tarde.</p>
+      </div>
+    `);
     }
 };
 
@@ -118,9 +136,9 @@ const loginAdmin = async (req, res) => {
         let token;
         if (environment === WEB) {
             token = jwt.sign({ id: admin._id, rol: "admin" }, process.env.JWT_SECRET, { expiresIn: "1h" })
-        }else if (environment === MOBILE) {
+        } else if (environment === MOBILE) {
             token = jwt.sign({ id: admin._id, rol: "admin" }, process.env.JWT_SECRET)
-        }else {
+        } else {
             return res.status(400).json({ msg: "Entorno no válido" });
         }
 
@@ -196,7 +214,7 @@ const recuperarContraseniaController = async (req, res) => {
 // Cambiar contraseña
 const cambiarContraseniaController = async (req, res) => {
     let { email, nuevaPassword } = req.body;
-    let { codigoRecuperacion } = req.query; 
+    let { codigoRecuperacion } = req.query;
 
     // Limpiar espacios innecesarios
     email = email.trim().toLowerCase();

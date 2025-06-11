@@ -235,7 +235,7 @@ const updateClienteProfile = async (req, res) => {
       return res.status(404).json({ msg: "Cliente no encontrado" });
     }
 
-    // ⛔️ Validar que al menos un campo válido fue enviado
+    // Validar que al menos un campo válido fue enviado
     const camposValidos = Object.entries(campos).filter(
       ([, value]) => esValorValido(value)
     );

@@ -232,17 +232,16 @@ const emptyCarritoController = async (req, res) => {
 
 const pagarCarritoController = async (req, res) => {
     const clienteId = req.clienteBDD._id.toString();
-    const { paymentMethodId } = req.body;
+    const { paymentMethodId, isTest } = req.body;
 
     if (!paymentMethodId) {
         return res.status(400).json({ msg: "paymentMethodId es requerido" });
     }
 
     try {
-        
         const carrito = await Carrito.findOneAndUpdate(
             { cliente_id: clienteId, estado: "pendiente" },
-            { estado: "procesando" }, 
+            { estado: "procesando" },
             { new: true }
         ).populate("productos.producto_id");
 
@@ -254,6 +253,13 @@ const pagarCarritoController = async (req, res) => {
             carrito.estado = "pendiente";
             await carrito.save();
             return res.status(400).json({ msg: "No puedes pagar un carrito vacío" });
+        }
+
+        // Validar monto mínimo requerido por Stripe (USD 0.50)
+        if (carrito.total < 0.5) {
+            carrito.estado = "pendiente";
+            await carrito.save();
+            return res.status(400).json({ msg: "El total debe ser al menos $0.50 para procesar el pago." });
         }
 
         const cliente = await Clientes.findById(clienteId);
@@ -281,7 +287,7 @@ const pagarCarritoController = async (req, res) => {
         });
 
         if (payment.status !== "succeeded") {
-            carrito.estado = "pendiente"; 
+            carrito.estado = "pendiente";
             await carrito.save();
             return res.status(400).json({ msg: "El pago no fue exitoso", estado: payment.status });
         }
@@ -327,11 +333,21 @@ const pagarCarritoController = async (req, res) => {
 
         carrito.productos = [];
         carrito.total = 0;
-        carrito.estado = "pendiente"; 
+        carrito.estado = "pendiente";
         await carrito.save();
 
+        // 🟨 Reembolso automático si es prueba (isTest === true y monto bajo)
+        if (totalVenta <= 0.5 && isTest === true) {
+            await stripe.refunds.create({
+                payment_intent: payment.id,
+                reason: "requested_by_customer",
+            });
+        }
+
         return res.status(200).json({
-            msg: "Pago exitoso. Venta registrada correctamente.",
+            msg: totalVenta <= 0.5 && isTest === true
+                ? "Pago exitoso y devuelto automáticamente (modo prueba)."
+                : "Pago exitoso. Venta registrada correctamente.",
             venta: nuevaVenta
         });
 
