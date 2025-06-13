@@ -92,7 +92,6 @@ const createProductoPersonalizadoController = async (req, res) => {
             return res.status(400).json({ msg: "ID de categoría no válido." });
         }
 
-        // Verificar duplicado exacto
         const productoExistente = await ProductoPersonalizado.findOne({
             cliente_id: req.clienteBDD._id,
             tipo_producto: tipo_producto.trim().toLowerCase(),
@@ -107,13 +106,21 @@ const createProductoPersonalizadoController = async (req, res) => {
             });
         }
 
-        const ingredientesEnBD = await Ingrediente.find({
-            _id: { $in: ingredientes },
-        });
+        const ingredientesEnBD = await Ingrediente.find({ _id: { $in: ingredientes } });
 
         if (ingredientesEnBD.length !== ingredientes.length) {
+            return res.status(400).json({ msg: "Uno o más ingredientes no existen." });
+        }
+
+        // Validar categoría
+        const ingredientesInvalidos = ingredientesEnBD.filter(ing =>
+            !ing.id_categoria.map(id => id.toString()).includes(id_categoria)
+        );
+
+        if (ingredientesInvalidos.length > 0) {
             return res.status(400).json({
-                msg: "Uno o más ingredientes no existen."
+                msg: "Uno o más ingredientes no corresponden a la categoría seleccionada.",
+                ingredientesInvalidos: ingredientesInvalidos.map(i => i.nombre),
             });
         }
 
@@ -195,7 +202,6 @@ const updateProductoPersonalizadoController = async (req, res) => {
     let { ingredientes } = req.body;
 
     try {
-        // 1. Autorización y validaciones básicas
         if (!req.clienteBDD) {
             return res.status(403).json({ msg: "Solo los clientes pueden actualizar productos personalizados." });
         }
@@ -212,13 +218,11 @@ const updateProductoPersonalizadoController = async (req, res) => {
             return res.status(403).json({ msg: "No tienes permiso para modificar este producto." });
         }
 
-        // 2. Normalizar `ingredientes`
         if (typeof ingredientes === "string") ingredientes = [ingredientes];
         if (!Array.isArray(ingredientes) || ingredientes.length < 4) {
             return res.status(400).json({ msg: "Debes enviar al menos 4 ingredientes: molde, color y 2 esencias." });
         }
 
-        // 3. Evitar que exista otro producto idéntico del mismo cliente
         const duplicado = await ProductoPersonalizado.findOne({
             _id: { $ne: id },
             cliente_id: req.clienteBDD._id,
@@ -231,17 +235,24 @@ const updateProductoPersonalizadoController = async (req, res) => {
             return res.status(409).json({ msg: "Ya tienes otro producto con esta misma combinación." });
         }
 
-        // 4. Obtener los ingredientes enviados y verificar que sean válidos
-        const ingredientesDB = await Ingrediente.find({
-            _id: { $in: ingredientes },
-            tipo_producto: producto.tipo_producto,
-            id_categoria: producto.id_categoria,
-        });
+        const ingredientesDB = await Ingrediente.find({ _id: { $in: ingredientes } });
+
         if (ingredientesDB.length !== ingredientes.length) {
-            return res.status(400).json({ msg: "Uno o más ingredientes no son válidos para este tipo o categoría." });
+            return res.status(400).json({ msg: "Uno o más ingredientes no existen." });
         }
 
-        // 5. Clasificar ingredientes y construir las respuestas con `_id`
+        // Validar categoría del producto
+        const ingredientesInvalidos = ingredientesDB.filter(ing =>
+            !ing.id_categoria.map(id => id.toString()).includes(producto.id_categoria.toString())
+        );
+
+        if (ingredientesInvalidos.length > 0) {
+            return res.status(400).json({
+                msg: "Uno o más ingredientes no corresponden a la categoría del producto.",
+                ingredientesInvalidos: ingredientesInvalidos.map(i => i.nombre),
+            });
+        }
+
         let molde = null;
         let color = null;
         const esencias = [];
@@ -267,19 +278,16 @@ const updateProductoPersonalizadoController = async (req, res) => {
             }
         }
 
-        // 6. Validar la composición final
         if (!molde || !color || esencias.length !== 2) {
             return res.status(400).json({ msg: "Debe haber 1 molde, 1 color y exactamente 2 esencias." });
         }
 
-        // 7. Guardar cambios
         producto.ingredientes = ingredientes;
         producto.precio = ingredientesDB.reduce((acc, ing) => acc + ing.precio, 0);
         await producto.save();
 
         const categoria = await mongoose.model("Categorias").findById(producto.id_categoria);
 
-        // 8. Respuesta
         return res.status(200).json({
             msg: "Producto personalizado actualizado exitosamente",
             producto_personalizado: {
