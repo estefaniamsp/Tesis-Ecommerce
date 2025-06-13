@@ -37,6 +37,7 @@ const addCarritoController = async (req, res) => {
     const { producto_id, cantidad } = req.body;
     const clienteId = req.clienteBDD._id.toString();
 
+    // Validaciones iniciales
     if (!producto_id || typeof cantidad !== 'number' || cantidad <= 0) {
         return res.status(400).json({ msg: "Producto o cantidad inválida." });
     }
@@ -60,54 +61,76 @@ const addCarritoController = async (req, res) => {
             return res.status(400).json({ msg: `El producto ${producto.nombre} está descontinuado.` });
         }
 
-        if (cantidad > producto.stock) {
+        // Bloquear si el producto no tiene stock
+        if (producto.stock === 0) {
             return res.status(400).json({
-                msg: `Solo hay ${producto.stock} unidades disponibles del producto ${producto.nombre}.`
+                msg: `El producto ${producto.nombre} no tiene stock disponible.`,
             });
         }
 
         const carrito = await Carrito.findOne({ cliente_id: clienteId, estado: "pendiente" });
-
         if (!carrito) {
             return res.status(400).json({ msg: "No tienes un carrito pendiente disponible. No se puede agregar productos." });
         }
 
-        const subtotal = Math.round(producto.precio * cantidad * 100) / 100;
-        // Verifica si el producto ya está
+        // Verifica si el producto ya está en el carrito
         const index = carrito.productos.findIndex(p => p.producto_id.toString() === producto._id.toString());
 
+        let nuevaCantidadTotal = cantidad;
+        if (index >= 0) {
+            nuevaCantidadTotal += carrito.productos[index].cantidad;
+        }
+
+        // Validar que no supere el stock total disponible
+        if (nuevaCantidadTotal > producto.stock) {
+            return res.status(400).json({
+                msg: `Ya tienes ${carrito.productos[index]?.cantidad || 0} en el carrito. Solo hay ${producto.stock} unidades disponibles del producto ${producto.nombre}.`
+            });
+        }
+
+        // Calcular subtotal
+        const subtotal = Math.round(producto.precio * cantidad * 100) / 100;
+
+        // Actualizar o agregar producto en el carrito
         if (index >= 0) {
             carrito.productos[index].cantidad += cantidad;
-            carrito.productos[index].subtotal += subtotal;
+            carrito.productos[index].subtotal = Math.round(
+                carrito.productos[index].cantidad * carrito.productos[index].precio_unitario * 100
+            ) / 100;
         } else {
             carrito.productos.push({
                 producto_id: producto._id,
                 cantidad,
                 precio_unitario: producto.precio,
-                subtotal
+                subtotal,
             });
         }
 
+        // Recalcular total
         const totalCalculado = carrito.productos.reduce((acc, p) => acc + p.subtotal, 0);
         carrito.total = Math.round(totalCalculado * 100) / 100;
+
         await carrito.save();
 
-        // ⚠️ Poblamos para devolver información completa del producto
-        const carritoActualizado = await Carrito.findById(carrito._id)
-            .populate({
-                path: 'productos.producto_id',
-                select: 'nombre imagen precio'
-            });
+        // Poblamos para devolver info del producto
+        const carritoActualizado = await Carrito.findById(carrito._id).populate({
+            path: 'productos.producto_id',
+            select: 'nombre imagen precio'
+        });
 
-        res.status(200).json({ msg: "Producto agregado al carrito", carrito: carritoActualizado });
+        return res.status(200).json({
+            msg: "Producto agregado al carrito",
+            carrito: carritoActualizado
+        });
+
     } catch (error) {
         console.error("Error al agregar producto al carrito:", error);
-        res.status(500).json({ msg: "Error interno del servidor" });
+        return res.status(500).json({ msg: "Error interno del servidor" });
     }
 };
 
 const updateCantidadProductoController = async (req, res) => {
-    const { producto_id, cantidad } = req.body; // cantidad puede ser positiva o negativa
+    const { producto_id, cantidad } = req.body;
     const clienteId = req.clienteBDD._id.toString();
 
     if (!producto_id || typeof cantidad !== 'number') {
@@ -128,6 +151,15 @@ const updateCantidadProductoController = async (req, res) => {
         const producto = await Producto.findById(producto_id);
         if (!producto) {
             return res.status(404).json({ msg: "Producto no existe en la base de datos." });
+        }
+
+        // ✅ Validaciones extra
+        if (!producto.activo) {
+            return res.status(400).json({ msg: `El producto ${producto.nombre} está descontinuado.` });
+        }
+
+        if (producto.stock === 0) {
+            return res.status(400).json({ msg: `El producto ${producto.nombre} no tiene stock disponible.` });
         }
 
         if (cantidad < 0 && Math.abs(cantidad) > carrito.productos[index].cantidad) {
@@ -156,7 +188,7 @@ const updateCantidadProductoController = async (req, res) => {
             mensaje = `Cantidad actualizada para el producto: ${producto.nombre}`;
         }
 
-        // Recalcular total del carrito con redondeo
+        // Recalcular total
         const totalCalculado = carrito.productos.reduce((acc, p) => acc + p.subtotal, 0);
         carrito.total = Math.round(totalCalculado * 100) / 100;
 

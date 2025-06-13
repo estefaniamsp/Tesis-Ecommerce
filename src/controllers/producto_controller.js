@@ -1,13 +1,16 @@
 import Producto from "../models/productos.js";
 import Ingrediente from "../models/ingredientes.js";
+import Categoria from "../models/categorias.js";
 import mongoose from "mongoose";
 import cloudinary from "../config/cloudinary.js";
 import { recomendarProductoConHF } from "../services/huggingFaceIA.js";
 
+const jabonesTipos = ["piel seca", "piel grasa", "piel mixta"];
+const velasTipos = ["decorativa", "aromatizante", "humidificación"];
+
 // Obtener todos los productos
 const getAllProductosController = async (req, res) => {
   try {
-    // Extraer y convertir los parámetros de consulta
     let page = parseInt(req.query.page, 10) || 1;
     let limit = parseInt(req.query.limit, 10) || 10;
     const { nombre, tipo } = req.query;
@@ -17,18 +20,10 @@ const getAllProductosController = async (req, res) => {
 
     const skip = (page - 1) * limit;
 
-    // Construir filtro dinámico
     const filtro = { activo: true };
+    if (nombre) filtro.nombre = { $regex: nombre, $options: 'i' };
+    if (tipo) filtro.tipo = { $regex: tipo, $options: 'i' };
 
-    if (nombre) {
-      filtro.nombre = { $regex: nombre, $options: 'i' }; 
-    }
-
-    if (tipo) {
-      filtro.tipo = { $regex: tipo, $options: 'i' }; 
-    }
-
-    // Consulta con filtros y paginación
     const productos = await Producto.find(filtro)
       .populate('id_categoria')
       .populate('ingredientes')
@@ -57,23 +52,14 @@ const getAllProductosController = async (req, res) => {
 // Obtener un producto por su ID
 const getProductoByIDController = async (req, res) => {
   const { id } = req.params;
-
-  // Verificar si el ID es válido
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ msg: "ID de producto no válido" });
   }
-
   try {
     const producto = await Producto.findById(id).populate('id_categoria').populate('ingredientes');
-
-    if (!producto) {
-      return res.status(404).json({ msg: "Producto no encontrado" });
-    }
-
-    if (!producto.activo) {
+    if (!producto || !producto.activo) {
       return res.status(404).json({ msg: "Producto no disponible" });
     }
-
     return res.status(200).json({ producto });
   } catch (error) {
     console.error(error);
@@ -101,22 +87,17 @@ const createProductoController = async (req, res) => {
   tipo = tipo?.trim();
 
   beneficios = !beneficios ? [] : typeof beneficios === "string" ? [beneficios] : beneficios;
-  const ingredientesEnBD = await Ingrediente.find({ _id: { $in: ingredientes } });
-
-  if (ingredientesEnBD.length !== ingredientes.length) {
-    throw new Error('Uno o más ingredientes no existen en la base de datos.');
-  }
 
   if (!nombre || !descripcion || !precio || !stock || !id_categoria || !aroma || !tipo || !req.file) {
     return res.status(400).json({ msg: "Todos los campos y la imagen son obligatorios" });
   }
 
-  if (isNaN(precio) || precio <= 0) {
-    return res.status(400).json({ msg: "El precio debe ser un número positivo" });
+  if (isNaN(precio) || precio < 1 || precio > 1000) {
+    return res.status(400).json({ msg: "El precio debe ser un número entre $1 y $1000." });
   }
 
-  if (isNaN(stock) || stock < 0) {
-    return res.status(400).json({ msg: "El stock debe ser un número mayor o igual a cero" });
+  if (isNaN(stock) || stock < 0 || stock > 100) {
+    return res.status(400).json({ msg: "El stock debe ser un número entre 0 y 100 unidades." });
   }
 
   if (!mongoose.Types.ObjectId.isValid(id_categoria)) {
@@ -124,6 +105,26 @@ const createProductoController = async (req, res) => {
   }
 
   try {
+    const ingredientesEnBD = await Ingrediente.find({ _id: { $in: ingredientes } });
+    if (ingredientesEnBD.length !== ingredientes.length) {
+      return res.status(400).json({ msg: "Uno o más ingredientes no existen en la base de datos." });
+    }
+
+    const categoria = await Categoria.findById(id_categoria);
+    if (!categoria) {
+      return res.status(404).json({ msg: "Categoría no encontrada" });
+    }
+
+    const nombreCategoria = categoria.nombre.toLowerCase();
+
+    if (nombreCategoria.includes("jabones") && !jabonesTipos.includes(tipo.toLowerCase())) {
+      return res.status(400).json({ msg: "Tipo inválido para 'Jabones artesanales'." });
+    }
+
+    if (nombreCategoria.includes("velas") && !velasTipos.includes(tipo.toLowerCase())) {
+      return res.status(400).json({ msg: "Tipo inválido para 'Velas artesanales'." });
+    }
+
     const productoExistente = await Producto.findOne({ nombre });
     if (productoExistente) {
       await cloudinary.uploader.destroy(req.file.filename);
@@ -145,9 +146,9 @@ const createProductoController = async (req, res) => {
     });
 
     await nuevoProducto.save();
+    await nuevoProducto.populate("ingredientes", "nombre");
 
     return res.status(201).json({ msg: "Producto creado exitosamente", producto: nuevoProducto });
-
   } catch (error) {
     console.error("Error al crear el producto:", error);
     if (req.file?.filename) await cloudinary.uploader.destroy(req.file.filename);
@@ -174,25 +175,14 @@ const updateProductoController = async (req, res) => {
     return res.status(400).json({ msg: "ID de producto no válido" });
   }
 
-  // Parsear ingredientes si vienen como string en form-data
   if (typeof ingredientes === 'string') {
-    try {
-      ingredientes = JSON.parse(ingredientes);
-    } catch {
-      ingredientes = ingredientes.split(',').map(i => i.trim());
-    }
+    try { ingredientes = JSON.parse(ingredientes); } catch { ingredientes = ingredientes.split(',').map(i => i.trim()); }
   }
 
-  // Parsear beneficios si vienen como string en form-data
   if (typeof beneficios === 'string') {
-    try {
-      beneficios = JSON.parse(beneficios);
-    } catch {
-      beneficios = beneficios.split(',').map(b => b.trim());
-    }
+    try { beneficios = JSON.parse(beneficios); } catch { beneficios = beneficios.split(',').map(b => b.trim()); }
   }
 
-  // Validaciones básicas
   if (precio && (isNaN(precio) || precio <= 0)) {
     return res.status(400).json({ msg: "El precio debe ser un número positivo" });
   }
@@ -201,10 +191,8 @@ const updateProductoController = async (req, res) => {
     return res.status(400).json({ msg: "El stock debe ser un número positivo o 0" });
   }
 
-  // Validar ingredientes si vienen
   if (ingredientes && Array.isArray(ingredientes)) {
     const ingredientesEnBD = await Ingrediente.find({ _id: { $in: ingredientes } });
-
     if (ingredientesEnBD.length !== ingredientes.length) {
       return res.status(400).json({ msg: "Uno o más ingredientes no existen en la base de datos" });
     }
@@ -212,26 +200,30 @@ const updateProductoController = async (req, res) => {
 
   try {
     const producto = await Producto.findById(id);
-    if (!producto) {
-      return res.status(404).json({ msg: "Producto no encontrado" });
-    }
+    if (!producto) return res.status(404).json({ msg: "Producto no encontrado" });
+    if (!producto.activo) return res.status(400).json({ msg: "El producto está desactivado" });
 
-    if (!producto.activo) {
-      return res.status(400).json({ msg: "El producto está desactivado" });
-    }
+    if (categoria) {
+      const cat = await Categoria.findById(categoria);
+      if (!cat) return res.status(404).json({ msg: "Categoría no encontrada" });
 
-    // Reemplazo de imagen si llega una nueva
-    if (req.file) {
-      if (producto.imagen_id) {
-        try {
-          await cloudinary.uploader.destroy(producto.imagen_id);
-        } catch (error) {
-          console.warn("No se pudo eliminar la imagen previa:", error.message);
-        }
+      const nombreCategoria = cat.nombre.toLowerCase();
+
+      if (nombreCategoria.includes("jabones") && tipo && !jabonesTipos.includes(tipo.toLowerCase())) {
+        return res.status(400).json({ msg: "Tipo inválido para 'Jabones artesanales'." });
+      }
+
+      if (nombreCategoria.includes("velas") && tipo && !velasTipos.includes(tipo.toLowerCase())) {
+        return res.status(400).json({ msg: "Tipo inválido para 'Velas artesanales'." });
       }
     }
 
-    // Preparar campos a actualizar
+    if (req.file) {
+      if (producto.imagen_id) {
+        try { await cloudinary.uploader.destroy(producto.imagen_id); } catch (e) { console.warn("Error al eliminar imagen previa:", e.message); }
+      }
+    }
+
     const camposActualizados = {
       nombre: nombre?.trim() || producto.nombre,
       descripcion: descripcion?.trim() || producto.descripcion,
@@ -250,13 +242,10 @@ const updateProductoController = async (req, res) => {
     }
 
     const productoActualizado = await Producto.findByIdAndUpdate(
-      id,
-      { $set: camposActualizados },
-      { new: true, runValidators: true }
-    );
-
+      id, 
+      { $set: camposActualizados }, 
+      { new: true, runValidators: true }).populate("ingredientes", "nombre"); 
     return res.status(200).json({ msg: "Producto actualizado exitosamente", producto: productoActualizado });
-
   } catch (error) {
     console.error("Error al actualizar producto:", error);
     return res.status(500).json({ msg: "Error al actualizar el producto", error: error.message });

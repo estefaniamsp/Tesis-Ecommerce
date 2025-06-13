@@ -2,32 +2,20 @@ import Ingrediente from "../models/ingredientes.js";
 import mongoose from "mongoose";
 import cloudinary from "../config/cloudinary.js";
 
-// Obtener todos los ingredientes
+// Obtener todos los ingredientes (sin categoría ahora)
 const getAllIngredientesController = async (req, res) => {
     try {
         let page = parseInt(req.query.page, 10) || 1;
         let limit = parseInt(req.query.limit, 10) || 10;
-        const { id_categoria } = req.query;
 
         if (page < 1) page = 1;
         if (limit < 1 || limit > 100) limit = 10;
 
         const skip = (page - 1) * limit;
 
-        const filtro = {};
-        if (id_categoria) {
-            if (!mongoose.Types.ObjectId.isValid(id_categoria)) {
-                return res.status(400).json({ msg: "ID de categoría no válido" });
-            }
-            filtro.id_categoria = id_categoria;
-        }
-
         const [ingredientes, total] = await Promise.all([
-            Ingrediente.find(filtro)
-                .populate("id_categoria")
-                .skip(skip)
-                .limit(limit),
-            Ingrediente.countDocuments(filtro)
+            Ingrediente.find().skip(skip).limit(limit),
+            Ingrediente.countDocuments()
         ]);
 
         return res.status(200).json({
@@ -36,7 +24,6 @@ const getAllIngredientesController = async (req, res) => {
             page,
             totalPages: Math.ceil(total / limit)
         });
-
     } catch (error) {
         console.error("Error al obtener ingredientes:", error);
         return res.status(500).json({ msg: "Error al obtener los ingredientes", error: error.message });
@@ -46,22 +33,15 @@ const getAllIngredientesController = async (req, res) => {
 // Obtener un ingrediente por su ID
 const getIngredienteByIDController = async (req, res) => {
     const { id } = req.params;
-
-    // Verificar si el ID es válido
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(404).json({ msg: "ID de ingrediente no válido" });
     }
-
     try {
-
-        const ingrediente = await Ingrediente.findById(id).populate("id_categoria");
-
+        const ingrediente = await Ingrediente.findById(id);
         if (!ingrediente) {
             return res.status(404).json({ msg: "Ingrediente no encontrado" });
         }
-
         return res.status(200).json({ ingrediente });
-
     } catch (error) {
         console.error("Error al obtener ingrediente:", error);
         return res.status(500).json({ msg: "Error al obtener el ingrediente", error: error.message });
@@ -70,43 +50,35 @@ const getIngredienteByIDController = async (req, res) => {
 
 // Crear un nuevo ingrediente
 const createIngredienteController = async (req, res) => {
-    let { nombre, stock, id_categoria, precio, tipo } = req.body;
+    let { nombre, stock, precio, tipo } = req.body;
 
-    if (!nombre || !stock || !id_categoria || !precio || !tipo || !req.file) {
-        return res.status(400).json({ msg: "Todos los campos son obligatorios" });
+    if (!nombre || !stock || !precio || !tipo || !req.file) {
+        return res.status(400).json({ msg: "Todos los campos son obligatorios: nombre, stock, precio, tipo e imagen." });
     }
 
-    nombre = nombre.trim();
-    tipo = tipo.trim();
-    stock = parseInt(stock.trim());
-    precio = parseFloat(precio.trim());
+    nombre = nombre.trim().toLowerCase();
+    tipo = tipo.trim().toLowerCase();
+    stock = parseInt(stock);
+    precio = parseFloat(precio);
 
-    if (isNaN(stock) || stock < 0) {
-        return res.status(400).json({ msg: "El stock debe ser un número entero mayor o igual a 0" });
+    if (isNaN(stock) || stock < 0 || stock > 100) {
+        return res.status(400).json({ msg: "El stock debe ser un número entero entre 0 y 100 unidades." });
     }
 
-    if (isNaN(precio) || precio < 0) {
-        return res.status(400).json({ msg: "El precio debe ser un número decimal mayor o igual a 0" });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(id_categoria)) {
-        return res.status(400).json({ msg: "El ID de la categoría no es válido" });
+    if (isNaN(precio) || precio < 1 || precio > 1000) {
+        return res.status(400).json({ msg: "El precio debe estar entre $1 y $1000." });
     }
 
     try {
-        // Verificar si ya existe un ingrediente con ese nombre
-        const ingredienteExistente = await Ingrediente.findOne({ nombre });
+        const ingredienteExistente = await Ingrediente.findOne({ nombre: { $regex: new RegExp(`^${nombre}$`, "i") } });
         if (ingredienteExistente) {
             await cloudinary.uploader.destroy(req.file.filename);
-            return res.status(400).json({
-                msg: "El ingrediente ya existe. La imagen subida fue eliminada automáticamente."
-            });
+            return res.status(400).json({ msg: "Ya existe un ingrediente con ese nombre. Imagen eliminada." });
         }
 
         const nuevoIngrediente = new Ingrediente({
             nombre,
             stock,
-            id_categoria,
             precio,
             tipo,
             imagen: req.file.path,
@@ -114,28 +86,20 @@ const createIngredienteController = async (req, res) => {
         });
 
         await nuevoIngrediente.save();
-
         return res.status(201).json({ msg: "Ingrediente creado exitosamente", ingrediente: nuevoIngrediente });
-
     } catch (error) {
         console.error("Error al crear ingrediente:", error);
-
         if (req.file?.filename) {
-            try {
-                await cloudinary.uploader.destroy(req.file.filename);
-            } catch (e) {
-                console.warn("No se pudo eliminar la imagen tras fallo:", e.message);
-            }
+            try { await cloudinary.uploader.destroy(req.file.filename); } catch { }
         }
-
-        return res.status(500).json({ msg: "Ocurrió un error interno. La imagen fue eliminada si se alcanzó a subir.", error: error.message, });
+        return res.status(500).json({ msg: "Error al crear ingrediente", error: error.message });
     }
 };
 
-// Actualizar un ingrediente existente
+// Actualizar un ingrediente
 const updateIngredienteController = async (req, res) => {
     const { id } = req.params;
-    const { nombre, stock, id_categoria, precio, tipo } = req.body;
+    let { nombre, stock, precio, tipo } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ msg: "ID no válido" });
@@ -148,88 +112,59 @@ const updateIngredienteController = async (req, res) => {
         }
 
         if (req.file) {
-            // Eliminar imagen anterior de Cloudinary si existe
             if (ingrediente.imagen_id) {
-                try {
-                    await cloudinary.uploader.destroy(ingrediente.imagen_id);
-                } catch (error) {
-                    console.warn("Error al eliminar imagen anterior:", error.message);
-                }
+                try { await cloudinary.uploader.destroy(ingrediente.imagen_id); } catch { }
             }
-
             ingrediente.imagen = req.file.path;
             ingrediente.imagen_id = req.file.filename;
         }
 
-        // Actualizar nombre, stock, categoria y precio si vienen
-        if (nombre !== undefined) ingrediente.nombre = nombre.trim();
-        if (tipo !== undefined) ingrediente.tipo = tipo.trim();
+        if (nombre !== undefined) {
+            nombre = nombre.trim().toLowerCase();
+            const duplicado = await Ingrediente.findOne({ _id: { $ne: id }, nombre: { $regex: new RegExp(`^${nombre}$`, "i") } });
+            if (duplicado) return res.status(400).json({ msg: "Ya existe otro ingrediente con ese nombre." });
+            ingrediente.nombre = nombre;
+        }
+
+        if (tipo !== undefined) ingrediente.tipo = tipo.trim().toLowerCase();
+
         if (stock !== undefined) {
-            const parsedStock = parseInt(stock);
-            if (isNaN(parsedStock) || parsedStock < 0) {
-                return res.status(400).json({ msg: "El stock debe ser un número entero válido mayor o igual a 0" });
-            }
-            ingrediente.stock = parseInt(stock.trim());
+            const s = parseInt(stock);
+            if (isNaN(s) || s < 0 || s > 100) return res.status(400).json({ msg: "El stock debe ser un número entre 0 y 100." });
+            ingrediente.stock = s;
         }
 
         if (precio !== undefined) {
-            const parsedPrecio = parseFloat(precio);
-            if (isNaN(parsedPrecio) || parsedPrecio < 0) {
-                return res.status(400).json({ msg: "El precio debe ser un número decimal válido mayor o igual a 0" });
-            }
-            ingrediente.precio = parsedPrecio;
-        }
-
-        if (id_categoria !== undefined) {
-            if (!mongoose.Types.ObjectId.isValid(id_categoria)) {
-                return res.status(400).json({ msg: "ID de categoría no válido" });
-            }
-            ingrediente.id_categoria = id_categoria.trim();
+            const p = parseFloat(precio);
+            if (isNaN(p) || p < 1 || p > 1000) return res.status(400).json({ msg: "El precio debe estar entre $1 y $1000." });
+            ingrediente.precio = p;
         }
 
         await ingrediente.save();
-
         return res.status(200).json({ msg: "Ingrediente actualizado exitosamente", ingrediente });
-
     } catch (error) {
         console.error("Error al actualizar ingrediente:", error);
-        return res.status(500).json({ msg: "Error al actualizar el ingrediente", error: error.message });
+        return res.status(500).json({ msg: "Error al actualizar ingrediente", error: error.message });
     }
 };
 
 // Eliminar un ingrediente
 const deleteIngredienteController = async (req, res) => {
     const { id } = req.params;
-
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ msg: "ID de ingrediente no válido" });
     try {
-
-        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ msg: "ID de ingrediente no válido" });
-        }
-
-        // Verificar si el ingrediente existe
         const ingrediente = await Ingrediente.findById(id);
-        if (!ingrediente) {
-            return res.status(404).json({ msg: "Ingrediente no encontrado" });
-        }
+        if (!ingrediente) return res.status(404).json({ msg: "Ingrediente no encontrado" });
 
-        // Eliminar la imagen de Cloudinary (si tiene imagen_id)
         if (ingrediente.imagen_id) {
-            try {
-                await cloudinary.uploader.destroy(ingrediente.imagen_id);
-            } catch (error) {
-                console.warn("No se pudo eliminar la imagen en Cloudinary:", error.message);
-            }
+            try { await cloudinary.uploader.destroy(ingrediente.imagen_id); } catch { }
         }
 
-        // Eliminar el ingrediente de la base de datos
-        await Ingrediente.deleteOne();
-
+        await ingrediente.deleteOne();
         return res.status(200).json({ msg: "Ingrediente eliminado exitosamente" });
-
     } catch (error) {
         console.error("Error al eliminar ingrediente:", error);
-        return res.status(500).json({ msg: "Error al eliminar el ingrediente", error: error.message });
+        return res.status(500).json({ msg: "Error al eliminar ingrediente", error: error.message });
     }
 };
 

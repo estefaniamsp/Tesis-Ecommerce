@@ -10,7 +10,6 @@ import {
     getDashboardController
 } from '../controllers/venta_controller.js'; 
 import verificarAuthAdmin from '../middlewares/admin_auth.js'; 
-import { validarVenta, manejarErrores } from '../middlewares/validacionForms.js';
 import verificarAutenticacion from '../middlewares/auth.js'; 
 
 const router = Router();

@@ -182,7 +182,6 @@ export const validarProducto = [
         .isMongoId()
         .withMessage("El id de la categoría debe ser un ObjectId válido."),
 
-    // Validación personalizada para beneficios (opcional, máximo 3 strings no vacíos)
     body("beneficios")
         .optional()
         .isArray({ max: 3 }).withMessage("Solo se permiten hasta 3 beneficios.")
@@ -206,8 +205,8 @@ export const validarCategoria = [
     check("nombre")
         .isLength({ min: 3, max: 50 })
         .withMessage("El nombre de la categoría debe tener entre 3 y 50 caracteres.")
-        .matches(/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/)
-        .withMessage("El nombre solo debe contener letras y espacios.")
+        .matches(/^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9\s]+$/)
+        .withMessage("El nombre solo debe contener letras, numeros y espacios.")
         .notEmpty()
         .withMessage('El campo "nombre" es obligatorio'),
 
@@ -223,26 +222,6 @@ export const validarCategoria = [
             }
             return true;
         }),
-];
-
-export const validarVenta = [
-    check("productos")
-        .isArray({ min: 1 })
-        .withMessage("Debe haber al menos un producto en la venta.")
-        .notEmpty()
-        .withMessage('El campo "productos" es obligatorio'),
-
-    check("productos.*.producto_id")
-        .isMongoId()
-        .withMessage("Cada producto debe tener un ID válido.")
-        .notEmpty()
-        .withMessage('El campo "producto_id" es obligatorio para cada producto'),
-
-    check("productos.*.cantidad")
-        .isInt({ min: 1 })
-        .withMessage("La cantidad de cada producto debe ser un número entero mayor o igual a 1.")
-        .notEmpty()
-        .withMessage('El campo "cantidad" es obligatorio para cada producto'),
 ];
 
 export const validarCarrito = [
@@ -315,7 +294,7 @@ export const validarPromocion = [
     check("nombre")
         .trim()
         .notEmpty().withMessage('El campo "nombre" es obligatorio')
-        .isLength({ min: 3, max: 100 }).withMessage("El nombre debe tener entre 3 y 100 caracteres."),
+        .isLength({ min: 3, max: 30 }).withMessage("El nombre debe tener entre 3 y 30 caracteres."),
 
     body("imagen")
         .custom((value, { req }) => {
@@ -350,11 +329,6 @@ export const validarIngrediente = [
         .withMessage("El precio debe ser un número decimal.")
         .notEmpty()
         .withMessage('El campo "precio" es obligatorio'),
-
-    check("id_categoria")
-        .notEmpty().withMessage('El campo "id_categoria" es obligatorio')
-        .isMongoId()
-        .withMessage("El id de la categoría debe ser un ObjectId válido."),
 
     check("tipo")
         .notEmpty()

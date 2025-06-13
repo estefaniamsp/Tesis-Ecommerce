@@ -65,17 +65,25 @@ const getPromocionByIdController = async (req, res) => {
 
 // Crear una nueva promoción
 const createPromocionController = async (req, res) => {
-    const { nombre } = req.body;
+    let { nombre } = req.body;
 
     if (!nombre || !req.file) {
         return res.status(400).json({ msg: "Todos los campos son obligatorios" });
     }
 
+    nombre = nombre.trim().toLowerCase();
+
     try {
-        const promocionExistente = await Promocion.findOne({ nombre });
+        // Verificar si ya existe una promoción con el mismo nombre (ignorando mayúsculas)
+        const promocionExistente = await Promocion.findOne({
+            nombre: { $regex: new RegExp(`^${nombre}$`, "i") }
+        });
+
         if (promocionExistente) {
             await cloudinary.uploader.destroy(req.file.filename);
-            return res.status(400).json({ msg: "La promoción ya existe. Imagen eliminada." });
+            return res.status(400).json({
+                msg: "La promoción ya existe. Imagen eliminada.",
+            });
         }
 
         const nuevaPromocion = new Promocion({
@@ -86,18 +94,27 @@ const createPromocionController = async (req, res) => {
 
         await nuevaPromocion.save();
 
-        return res.status(201).json({ msg: "Promoción creada exitosamente", promocion: nuevaPromocion });
+        return res.status(201).json({
+            msg: "Promoción creada exitosamente",
+            promocion: nuevaPromocion,
+        });
+
     } catch (error) {
         console.error("Error al crear la promoción:", error);
-        if (req.file?.filename) await cloudinary.uploader.destroy(req.file.filename);
-        return res.status(500).json({ msg: "Error al crear la promoción", error: error.message });
+        if (req.file?.filename) {
+            await cloudinary.uploader.destroy(req.file.filename);
+        }
+        return res.status(500).json({
+            msg: "Error al crear la promoción",
+            error: error.message,
+        });
     }
 };
 
 // Actualizar una promoción
 const updatePromocionController = async (req, res) => {
     const { id } = req.params;
-    const { nombre } = req.body;
+    let { nombre } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ msg: "ID no válido" });
@@ -109,6 +126,28 @@ const updatePromocionController = async (req, res) => {
             return res.status(404).json({ msg: "Promoción no encontrada" });
         }
 
+        // Si hay nuevo nombre, verificar que no se repita
+        if (nombre !== undefined) {
+            nombre = nombre.trim().toLowerCase();
+
+            const nombreExistente = await Promocion.findOne({
+                _id: { $ne: id }, // distinto al actual
+                nombre: { $regex: new RegExp(`^${nombre}$`, "i") },
+            });
+
+            if (nombreExistente) {
+                if (req.file?.filename) {
+                    await cloudinary.uploader.destroy(req.file.filename);
+                }
+                return res.status(400).json({
+                    msg: "Ya existe otra promoción con ese nombre.",
+                });
+            }
+
+            promocion.nombre = nombre;
+        }
+
+        // Actualizar imagen si hay nueva
         if (req.file) {
             if (promocion.imagen_id) {
                 try {
@@ -122,14 +161,18 @@ const updatePromocionController = async (req, res) => {
             promocion.imagen_id = req.file.filename;
         }
 
-        promocion.nombre = nombre || promocion.nombre;
-
         await promocion.save();
 
-        return res.status(200).json({ msg: "Promoción actualizada exitosamente", promocion });
+        return res.status(200).json({
+            msg: "Promoción actualizada exitosamente",
+            promocion,
+        });
     } catch (error) {
         console.error("Error al actualizar la promoción:", error);
-        return res.status(500).json({ msg: "Error al actualizar la promoción", error: error.message });
+        return res.status(500).json({
+            msg: "Error al actualizar la promoción",
+            error: error.message,
+        });
     }
 };
 
