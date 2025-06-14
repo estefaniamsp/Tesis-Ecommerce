@@ -1,6 +1,7 @@
 import Producto from "../models/productos.js";
 import Ingrediente from "../models/ingredientes.js";
 import Categoria from "../models/categorias.js";
+import VistaProducto from "../models/vistaProducto.js";
 import mongoose from "mongoose";
 import cloudinary from "../config/cloudinary.js";
 import { recomendarProductoConHF } from "../services/huggingFaceIA.js";
@@ -52,14 +53,32 @@ const getAllProductosController = async (req, res) => {
 // Obtener un producto por su ID
 const getProductoByIDController = async (req, res) => {
   const { id } = req.params;
+
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ msg: "ID de producto no válido" });
   }
+
   try {
-    const producto = await Producto.findById(id).populate('id_categoria').populate('ingredientes');
+    const producto = await Producto.findById(id)
+      .populate('id_categoria')
+      .populate('ingredientes');
+
     if (!producto || !producto.activo) {
       return res.status(404).json({ msg: "Producto no disponible" });
     }
+
+    // 🔒 Si hay un cliente logueado, registrar vista automáticamente
+    if (req.clienteBDD) {
+      try {
+        await VistaProducto.create({
+          cliente_id: req.clienteBDD._id,
+          producto_id: producto._id,
+        });
+      } catch (vistaError) {
+        console.warn("No se pudo registrar vista del producto:", vistaError.message);
+      }
+    }
+
     return res.status(200).json({ producto });
   } catch (error) {
     console.error(error);
