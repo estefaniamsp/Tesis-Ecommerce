@@ -1,24 +1,18 @@
-import Carritos from '../models/carritos.js';
+import Ventas from '../models/ventas.js';
 import Ingrediente from '../models/ingredientes.js';
 import Categoria from '../models/categorias.js';
+import VistaProducto from '../models/vistaProducto.js';
 import { HfInference } from "@huggingface/inference";
 
 const hf = new HfInference(process.env.TOKEN_HUGGINGFACE);
 
 async function recomendarProductoConHF(clienteId, tipo, id_categoria) {
   const categoria = await Categoria.findById(id_categoria);
-  if (!categoria) {
-    throw new Error("La categoría indicada no existe.");
-  }
+  if (!categoria) throw new Error("La categoría indicada no existe.");
 
-  // Obtener todos los ingredientes disponibles para esa categoría
-  const ingredientesDisponibles = await Ingrediente.find({ id_categoria: categoria._id });
+  const ingredientesDisponibles = await Ingrediente.find({ id_categoria: id_categoria });
+  if (ingredientesDisponibles.length === 0) throw new Error("No hay ingredientes disponibles para esta categoría.");
 
-  if (ingredientesDisponibles.length === 0) {
-    throw new Error("No hay ingredientes registrados para esta categoría.");
-  }
-
-  // Agrupar ingredientes por tipo
   const ingredientesAgrupados = ingredientesDisponibles.reduce((acc, ing) => {
     const tipo = ing.tipo.toLowerCase();
     if (!acc[tipo]) acc[tipo] = [];
@@ -26,70 +20,57 @@ async function recomendarProductoConHF(clienteId, tipo, id_categoria) {
     return acc;
   }, {});
 
-  const carritos = await Carritos.find({ cliente_id: clienteId, estado: "completado" })
-    .populate({
-      path: "productos.producto_id",
-      populate: { path: "id_categoria ingredientes" }
-    });
+  // Obtener historial de ventas finalizadas
+  const ventas = await Ventas.find({ cliente_id: clienteId, estado: "finalizado" })
+    .populate({ path: "productos.producto_id", populate: { path: "id_categoria ingredientes" } });
 
-  const productosComprados = carritos.flatMap(c =>
-    c.productos.map(p => p.producto_id)
-  ).filter(p => p?.id_categoria && p.id_categoria._id.equals(categoria._id));
+  const productosComprados = ventas.flatMap(v => v.productos.map(p => p.producto_id))
+    .filter(p => p?.id_categoria && p.id_categoria._id.equals(id_categoria));
 
-  let prompt = "";
+  // Obtener historial de vistas si no hay compras
+  let productosBase = productosComprados;
+
+  if (productosBase.length === 0) {
+    const vistas = await VistaProducto.find({ cliente_id: clienteId })
+      .sort({ createdAt: -1 })
+      .populate("producto_id");
+
+    productosBase = vistas.map(v => v.producto_id)
+      .filter(p => p?.id_categoria && p.id_categoria.equals(id_categoria));
+  }
 
   const listaIngredientes = Object.entries(ingredientesAgrupados)
     .map(([tipo, nombres]) => `${tipo}: ${nombres.join(', ')}`)
     .join('\n');
 
-  if (productosComprados.length > 0) {
-    prompt = `
-El cliente ha comprado productos de la categoría "${categoria.nombre}" y desea un nuevo producto del tipo "${tipo}".
+  let prompt = `
+El cliente desea un producto de tipo "${tipo}" en la categoría "${categoria.nombre}".
 
 Ingredientes disponibles (agrupados por tipo):
 ${listaIngredientes}
 
-Productos anteriores:
-${productosComprados.map(p => `${p.nombre}: ${p.descripcion || "sin descripción"}`).join('\n')}
+`;
 
-Genera un producto personalizado en formato JSON:
-{
-  "nombre": string,
-  "categoria": string,
-  "ingredientes": {
-    "molde": string,
-    "esencia": string,
-    "colorante": string
-  },
-  "beneficios": array de strings,
-  "aroma": string
-}
-
- Solo responde el objeto JSON. Usa solo ingredientes disponibles. Máximo 150 tokens.
-    `;
-  } else {
-    prompt = `
-El cliente desea un producto personalizado de tipo "${tipo}", categoría "${categoria.nombre}".
-
-Ingredientes disponibles (agrupados por tipo):
-${listaIngredientes}
-
-Genera un producto creativo y útil en formato JSON:
-{
-  "nombre": string,
-  "categoria": string,
-  "ingredientes": {
-    "molde": string,
-    "esencia": string,
-    "colorante": string
-  },
-  "beneficios": array de strings,
-  "aroma": string
-}
-
- Solo responde el objeto JSON. Usa solo ingredientes disponibles. Máximo 150 tokens.
-    `;
+  if (productosBase.length > 0) {
+    prompt += `Historial del cliente:
+${productosBase.map(p => `${p.nombre}: ${p.descripcion || "sin descripción"}`).join('\n')}
+`;
   }
+
+  prompt += `\nGenera un producto personalizado en formato JSON:
+{
+  "nombre": string,
+  "categoria": string,
+  "ingredientes": {
+    "molde": string,
+    "color": string,
+    "esencia1": string,
+    "esencia2": string
+  },
+  "beneficios": array de strings,
+  "aroma": string
+}
+Solo responde el objeto JSON. Usa solo ingredientes disponibles. Máximo 150 tokens.`;
 
   const response = await hf.chatCompletion({
     model: "meta-llama/Llama-3.1-8B-Instruct",
@@ -108,45 +89,63 @@ Genera un producto creativo y útil en formato JSON:
     return { texto: textoIA };
   }
 
-  // Match de ingredientes por tipo y nombre
   const nombresIA = Object.entries(estructuraIA.ingredientes).map(
     ([tipo, nombre]) => ({ tipo, nombre: nombre.trim().toLowerCase() })
   );
 
   let ingredientesBD = ingredientesDisponibles.filter(ing =>
-    nombresIA.some(
-      entrada =>
-        ing.tipo.toLowerCase() === entrada.tipo &&
-        ing.nombre.trim().toLowerCase() === entrada.nombre
+    nombresIA.some(entrada =>
+      ing.tipo.toLowerCase().includes(entrada.tipo.toLowerCase()) &&
+      ing.nombre.trim().toLowerCase() === entrada.nombre
     )
   );
 
-  // Asegurar que siempre haya molde, esencia y colorante
-  const tiposRequeridos = ["molde", "esencia", "colorante"];
-
-  for (const tipo of tiposRequeridos) {
-    const yaIncluido = ingredientesBD.some(ing => ing.tipo.toLowerCase() === tipo);
-    if (!yaIncluido) {
-      const opciones = ingredientesDisponibles.filter(ing => ing.tipo.toLowerCase() === tipo);
-      if (opciones.length > 0) {
-        const random = opciones[Math.floor(Math.random() * opciones.length)];
-        ingredientesBD.push(random);
-      }
+  // Asegurar al menos un molde y colorante, y exactamente 2 esencias
+  const tiposRequeridos = ["molde", "color"];
+  tiposRequeridos.forEach(tipo => {
+    const existe = ingredientesBD.some(ing => ing.tipo.toLowerCase() === tipo);
+    if (!existe) {
+      const candidatos = ingredientesDisponibles.filter(ing => ing.tipo.toLowerCase() === tipo);
+      if (candidatos.length > 0) ingredientesBD.push(candidatos[Math.floor(Math.random() * candidatos.length)]);
     }
+  });
+
+  const esenciasIncluidas = ingredientesBD.filter(ing => ing.tipo.toLowerCase() === "esencia");
+  const faltantesEsencias = ingredientesDisponibles.filter(ing => ing.tipo.toLowerCase() === "esencia" && !esenciasIncluidas.includes(ing));
+
+  while (esenciasIncluidas.length < 2 && faltantesEsencias.length > 0) {
+    ingredientesBD.push(faltantesEsencias.pop());
   }
+
+  const molde = ingredientesBD.find(i => i.tipo.toLowerCase() === "molde");
+  const color = ingredientesBD.find(i => i.tipo.toLowerCase() === "color");
+  const esenciasFinal = ingredientesBD.filter(i => i.tipo.toLowerCase() === "esencia").slice(0, 2);
 
   const precioTotal = ingredientesBD.reduce((total, ing) => total + ing.precio, 0);
 
   return {
-    ...estructuraIA,
-    ingredientes: ingredientesBD.map(ing => {
-      const { stock, createdAt, updatedAt, __v, ...resto } = ing.toObject();
-      return resto;
-    }),
-    precio: precioTotal,
-    ...(ingredientesBD.length === 0 && {
-      advertencia: "Ninguno de los ingredientes generados por la IA coincidió con los disponibles."
-    })
+    msg: "Producto personalizado creado exitosamente",
+    producto_personalizado: {
+      categoria: categoria.nombre.toLowerCase(),
+      tipo: tipo,
+      aroma: estructuraIA.aroma,
+      molde: molde && {
+        _id: molde._id,
+        nombre: molde.nombre,
+        imagen: molde.imagen
+      },
+      color: color && {
+        _id: color._id,
+        nombre: color.nombre,
+        imagen: color.imagen
+      },
+      esencias: esenciasFinal.map(e => ({
+        _id: e._id,
+        nombre: e.nombre,
+        imagen: e.imagen
+      })),
+      precio: precioTotal
+    }
   };
 }
 
