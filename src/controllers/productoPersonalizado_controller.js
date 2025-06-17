@@ -72,19 +72,19 @@ const createProductoPersonalizadoController = async (req, res) => {
             return res.status(403).json({ msg: "Solo los clientes pueden crear productos personalizados." });
         }
 
-        let { ingredientes, tipo_producto, id_categoria, aroma } = req.body;
+        let { ingredientes, tipo_producto, id_categoria } = req.body;
 
-        if (!ingredientes || !tipo_producto || !id_categoria || !aroma) {
+        if (!ingredientes || !tipo_producto || !id_categoria) {
             return res.status(400).json({
-                msg: "Todos los campos son obligatorios: ingredientes, tipo_producto, aroma y categoría.",
+                msg: "Todos los campos son obligatorios: ingredientes, tipo_producto y categoría.",
                 camposRecibidos: req.body,
             });
         }
 
         if (typeof ingredientes === "string") ingredientes = [ingredientes];
-        if (!Array.isArray(ingredientes) || ingredientes.length < 4) {
+        if (!Array.isArray(ingredientes) || ingredientes.length < 5) {
             return res.status(400).json({
-                msg: "Debe haber al menos 4 ingredientes: molde, color y 2 esencias."
+                msg: "Debe haber al menos 5 ingredientes: molde, color, 2 esencias y 1 aroma."
             });
         }
 
@@ -96,13 +96,12 @@ const createProductoPersonalizadoController = async (req, res) => {
             cliente_id: req.clienteBDD._id,
             tipo_producto: tipo_producto.trim().toLowerCase(),
             id_categoria,
-            aroma: aroma.trim(),
             ingredientes: { $all: ingredientes, $size: ingredientes.length }
         });
 
         if (productoExistente) {
             return res.status(409).json({
-                msg: "Ya tienes un producto personalizado con estos mismos ingredientes, tipo y aroma."
+                msg: "Ya tienes un producto personalizado con estos mismos ingredientes y tipo."
             });
         }
 
@@ -112,7 +111,6 @@ const createProductoPersonalizadoController = async (req, res) => {
             return res.status(400).json({ msg: "Uno o más ingredientes no existen." });
         }
 
-        // Validar categoría
         const ingredientesInvalidos = ingredientesEnBD.filter(ing =>
             !ing.id_categoria.map(id => id.toString()).includes(id_categoria)
         );
@@ -126,6 +124,7 @@ const createProductoPersonalizadoController = async (req, res) => {
 
         let molde = null;
         let color = null;
+        let aroma = null;
         const esencias = [];
         const idsUnicos = new Set();
 
@@ -151,12 +150,16 @@ const createProductoPersonalizadoController = async (req, res) => {
                 color = data;
             } else if (["esencia", "escencia", "fragancia"].includes(tipo)) {
                 esencias.push(data);
+            } else if (tipo === "aroma") {
+                if (aroma) return res.status(400).json({ msg: "Solo se permite un aroma." });
+                aroma = data;
             }
         }
 
         const errores = [];
         if (!molde) errores.push("Debe haber exactamente 1 molde.");
         if (!color) errores.push("Debe haber exactamente 1 color.");
+        if (!aroma) errores.push("Debe haber exactamente 1 aroma.");
         if (esencias.length < 2) errores.push("Faltan esencias, se requieren 2.");
         if (esencias.length > 2) errores.push("Hay demasiadas esencias, solo se permiten 2.");
 
@@ -172,7 +175,7 @@ const createProductoPersonalizadoController = async (req, res) => {
             tipo_producto: tipo_producto.trim().toLowerCase(),
             id_categoria,
             precio,
-            aroma: aroma.trim(),
+            aroma: aroma.nombre,
         });
 
         await nuevoProducto.save();
@@ -184,7 +187,7 @@ const createProductoPersonalizadoController = async (req, res) => {
                 _id: nuevoProducto._id,
                 categoria: nuevoProducto.id_categoria?.nombre?.toLowerCase() || "desconocida",
                 tipo: nuevoProducto.tipo_producto,
-                aroma: nuevoProducto.aroma,
+                aroma: aroma.nombre,
                 molde,
                 color,
                 esencias,
@@ -219,8 +222,8 @@ const updateProductoPersonalizadoController = async (req, res) => {
         }
 
         if (typeof ingredientes === "string") ingredientes = [ingredientes];
-        if (!Array.isArray(ingredientes) || ingredientes.length < 4) {
-            return res.status(400).json({ msg: "Debes enviar al menos 4 ingredientes: molde, color y 2 esencias." });
+        if (!Array.isArray(ingredientes) || ingredientes.length < 5) {
+            return res.status(400).json({ msg: "Debes enviar al menos 5 ingredientes: molde, color, aroma y 2 esencias." });
         }
 
         const duplicado = await ProductoPersonalizado.findOne({
@@ -241,7 +244,6 @@ const updateProductoPersonalizadoController = async (req, res) => {
             return res.status(400).json({ msg: "Uno o más ingredientes no existen." });
         }
 
-        // Validar categoría del producto
         const ingredientesInvalidos = ingredientesDB.filter(ing =>
             !ing.id_categoria.map(id => id.toString()).includes(producto.id_categoria.toString())
         );
@@ -255,6 +257,7 @@ const updateProductoPersonalizadoController = async (req, res) => {
 
         let molde = null;
         let color = null;
+        let aroma = null;
         const esencias = [];
         const idsUnicos = new Set();
 
@@ -275,15 +278,19 @@ const updateProductoPersonalizadoController = async (req, res) => {
                 color = info;
             } else if (["esencia", "escencia", "fragancia"].includes(tipo)) {
                 esencias.push(info);
+            } else if (tipo === "aroma") {
+                if (aroma) return res.status(400).json({ msg: "Solo se permite un aroma." });
+                aroma = info;
             }
         }
 
-        if (!molde || !color || esencias.length !== 2) {
-            return res.status(400).json({ msg: "Debe haber 1 molde, 1 color y exactamente 2 esencias." });
+        if (!molde || !color || !aroma || esencias.length !== 2) {
+            return res.status(400).json({ msg: "Debe haber 1 molde, 1 color, 1 aroma y exactamente 2 esencias." });
         }
 
         producto.ingredientes = ingredientes;
         producto.precio = ingredientesDB.reduce((acc, ing) => acc + ing.precio, 0);
+        producto.aroma = aroma.nombre;
         await producto.save();
 
         const categoria = await mongoose.model("Categorias").findById(producto.id_categoria);
@@ -306,7 +313,7 @@ const updateProductoPersonalizadoController = async (req, res) => {
     }
 };
 
-// controllers/productosPersonalizadosController.js
+// actualizar imagen de un producto personalizado
 const updateImagenProductoPersonalizadoController = async (req, res) => {
     const { id } = req.params;
 

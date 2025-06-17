@@ -20,14 +20,12 @@ async function recomendarProductoConHF(clienteId, tipo, id_categoria) {
     return acc;
   }, {});
 
-  // Obtener historial de ventas finalizadas
   const ventas = await Ventas.find({ cliente_id: clienteId, estado: "finalizado" })
     .populate({ path: "productos.producto_id", populate: { path: "id_categoria ingredientes" } });
 
   const productosComprados = ventas.flatMap(v => v.productos.map(p => p.producto_id))
     .filter(p => p?.id_categoria && p.id_categoria._id.equals(id_categoria));
 
-  // Obtener historial de vistas si no hay compras
   let productosBase = productosComprados;
 
   if (productosBase.length === 0) {
@@ -48,7 +46,6 @@ El cliente desea un producto de tipo "${tipo}" en la categoría "${categoria.nom
 
 Ingredientes disponibles (agrupados por tipo):
 ${listaIngredientes}
-
 `;
 
   if (productosBase.length > 0) {
@@ -93,6 +90,10 @@ Solo responde el objeto JSON. Usa solo ingredientes disponibles. Máximo 150 tok
     ([tipo, nombre]) => ({ tipo, nombre: nombre.trim().toLowerCase() })
   );
 
+  if (estructuraIA.aroma) {
+    nombresIA.push({ tipo: "aroma", nombre: estructuraIA.aroma.trim().toLowerCase() });
+  }
+
   let ingredientesBD = ingredientesDisponibles.filter(ing =>
     nombresIA.some(entrada =>
       ing.tipo.toLowerCase().includes(entrada.tipo.toLowerCase()) &&
@@ -100,8 +101,7 @@ Solo responde el objeto JSON. Usa solo ingredientes disponibles. Máximo 150 tok
     )
   );
 
-  // Asegurar al menos un molde y colorante, y exactamente 2 esencias
-  const tiposRequeridos = ["molde", "color"];
+  const tiposRequeridos = ["molde", "color", "aroma"];
   tiposRequeridos.forEach(tipo => {
     const existe = ingredientesBD.some(ing => ing.tipo.toLowerCase() === tipo);
     if (!existe) {
@@ -111,14 +111,16 @@ Solo responde el objeto JSON. Usa solo ingredientes disponibles. Máximo 150 tok
   });
 
   const esenciasIncluidas = ingredientesBD.filter(ing => ing.tipo.toLowerCase() === "esencia");
-  const faltantesEsencias = ingredientesDisponibles.filter(ing => ing.tipo.toLowerCase() === "esencia" && !esenciasIncluidas.includes(ing));
-
+  const faltantesEsencias = ingredientesDisponibles.filter(
+    ing => ing.tipo.toLowerCase() === "esencia" && !esenciasIncluidas.includes(ing)
+  );
   while (esenciasIncluidas.length < 2 && faltantesEsencias.length > 0) {
     ingredientesBD.push(faltantesEsencias.pop());
   }
 
   const molde = ingredientesBD.find(i => i.tipo.toLowerCase() === "molde");
   const color = ingredientesBD.find(i => i.tipo.toLowerCase() === "color");
+  const aroma = ingredientesBD.find(i => i.tipo.toLowerCase() === "aroma");
   const esenciasFinal = ingredientesBD.filter(i => i.tipo.toLowerCase() === "esencia").slice(0, 2);
 
   const precioTotal = ingredientesBD.reduce((total, ing) => total + ing.precio, 0);
@@ -128,7 +130,11 @@ Solo responde el objeto JSON. Usa solo ingredientes disponibles. Máximo 150 tok
     producto_personalizado: {
       categoria: categoria.nombre.toLowerCase(),
       tipo: tipo,
-      aroma: estructuraIA.aroma,
+      aroma: aroma && {
+        _id: aroma._id,
+        nombre: aroma.nombre,
+        imagen: aroma.imagen
+      },
       molde: molde && {
         _id: molde._id,
         nombre: molde.nombre,
