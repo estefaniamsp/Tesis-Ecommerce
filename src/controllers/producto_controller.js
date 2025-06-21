@@ -2,6 +2,7 @@ import Producto from "../models/productos.js";
 import Ingrediente from "../models/ingredientes.js";
 import Categoria from "../models/categorias.js";
 import VistaProducto from "../models/vistaProducto.js";
+import ProductoPersonalizado from "../models/productosPersonalizados.js";
 import mongoose from "mongoose";
 import cloudinary from "../config/cloudinary.js";
 import { recomendarProductoConHF } from "../services/huggingFaceIA.js";
@@ -261,9 +262,9 @@ const updateProductoController = async (req, res) => {
     }
 
     const productoActualizado = await Producto.findByIdAndUpdate(
-      id, 
-      { $set: camposActualizados }, 
-      { new: true, runValidators: true }).populate("ingredientes", "nombre"); 
+      id,
+      { $set: camposActualizados },
+      { new: true, runValidators: true }).populate("ingredientes", "nombre");
     return res.status(200).json({ msg: "Producto actualizado exitosamente", producto: productoActualizado });
   } catch (error) {
     console.error("Error al actualizar producto:", error);
@@ -343,11 +344,46 @@ const personalizarProductoIAController = async (req, res) => {
 
     const recomendacion = await recomendarProductoConHF(req.clienteBDD._id, tipo, id_categoria);
 
-    return res.status(200).json({ recomendacion });
+    const productoIA = recomendacion?.producto_personalizado;
+    if (!productoIA) {
+      return res.status(400).json({ msg: "La IA no devolvió un producto válido.", raw: recomendacion });
+    }
+
+    // Extraer IDs de ingredientes
+    const ingredientes = [
+      productoIA.molde._id,
+      productoIA.color._id,
+      productoIA.aroma._id,
+      productoIA.esencias[0]._id,
+      productoIA.esencias[1]._id,
+    ];
+
+    // Guardar el producto en la base de datos
+    const nuevoProducto = new ProductoPersonalizado({
+      cliente_id: req.clienteBDD._id,
+      tipo_producto: productoIA.tipo,
+      id_categoria,
+      ingredientes,
+      precio: productoIA.precio,
+      aroma: productoIA.aroma.nombre,
+    });
+
+    await nuevoProducto.save();
+
+    return res.status(201).json({
+      msg: "Producto generado por IA creado y guardado exitosamente.",
+      producto_id: nuevoProducto._id,
+      tipo_producto: "ia",
+      producto_personalizado: {
+        ...productoIA,
+        _id: nuevoProducto._id,
+        origen: "ia"
+      }
+    });
 
   } catch (error) {
-    console.error("Error al obtener la recomendación:", error.message || error);
-    return res.status(500).json({ msg: "Error al obtener la recomendación", error: error.message });
+    console.error("Error al personalizar producto con IA:", error.message || error);
+    return res.status(500).json({ msg: "Error al personalizar producto con IA", error: error.message });
   }
 };
 

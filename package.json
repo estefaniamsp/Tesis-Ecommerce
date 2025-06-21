@@ -4,7 +4,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "cross-env NODE_ENV=test jest --runInBand --detectOpenHandles --verbose",
     "start": "node src/index.js",
     "dev": "node --watch src/index.js"
   },
@@ -31,5 +31,13 @@
     "nodemailer": "^6.10.0",
     "stripe": "^18.2.1",
     "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.27.4",
+    "@babel/preset-env": "^7.27.2",
+    "babel-jest": "^29.7.0",
+    "babel-plugin-transform-import-meta": "^2.3.3",
+    "cross-env": "^7.0.3",
+    "jest": "^29.7.0"
   }
 }

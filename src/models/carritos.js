@@ -10,7 +10,13 @@ const carritoSchema = new mongoose.Schema({
         {
             producto_id: {
                 type: mongoose.Schema.Types.ObjectId,
-                ref: 'Productos',
+                required: true
+                // Nota: el ref es dinámico según tipo_producto
+            },
+            tipo_producto: {
+                type: String,
+                enum: ['normal', 'personalizado', 'ia'],
+                default: 'normal',
                 required: true
             },
             cantidad: {
@@ -38,7 +44,7 @@ const carritoSchema = new mongoose.Schema({
     },
     estado: {
         type: String,
-        enum: ['pendiente', 'pagado'],
+        enum: ['pendiente', 'pagado', 'procesando'],
         default: 'pendiente'
     },
 },
@@ -51,8 +57,7 @@ const carritoSchema = new mongoose.Schema({
                 delete ret.updatedAt;
             },
         },
-    }
-);
+    });
 
 // Método para calcular el total del carrito y los subtotales de cada producto
 carritoSchema.methods.calcularTotal = function () {
