@@ -10,21 +10,46 @@ const stripe = new Stripe(process.env.STRIPE_PRIVATE_KEY);
 const getCarritoClienteController = async (req, res) => {
     try {
         const clienteId = req.clienteBDD._id;
+
         const carrito = await Carrito.findOne({ cliente_id: clienteId });
 
         if (!carrito) {
             return res.status(404).json({ msg: "No tienes un carrito asociado aún" });
         }
 
-        for (const item of carrito.productos) {
-            if (item.tipo_producto === "personalizado" || item.tipo_producto === "ia") {
-                await item.populate({ path: "producto_id", model: "ProductoPersonalizado", populate: "ingredientes" });
-            } else {
-                await item.populate({ path: "producto_id", model: "Producto" });
-            }
-        }
+        // Separar por tipo de producto
+        const idsNormales = carrito.productos
+            .filter(p => p.tipo_producto === "normal")
+            .map(p => p.producto_id);
 
-        return res.status(200).json({ carrito });
+        const idsPersonalizados = carrito.productos
+            .filter(p => p.tipo_producto === "personalizado" || p.tipo_producto === "ia")
+            .map(p => p.producto_id);
+
+        const [productosNormales, productosPersonalizados] = await Promise.all([
+            Producto.find({ _id: { $in: idsNormales } }),
+            ProductoPersonalizado.find({ _id: { $in: idsPersonalizados } }).populate("ingredientes"),
+        ]);
+
+        // Enlazar detalles de producto al carrito
+        const productosEnriquecidos = carrito.productos.map(item => {
+            const encontrado = (item.tipo_producto === "normal"
+                ? productosNormales
+                : productosPersonalizados
+            ).find(p => p._id.toString() === item.producto_id.toString());
+
+            return {
+                ...item.toObject(),
+                producto: encontrado || null,
+            };
+        });
+
+        return res.status(200).json({
+            carrito: {
+                ...carrito.toObject(),
+                productos: productosEnriquecidos,
+            }
+        });
     } catch (error) {
         console.error("Error al obtener el carrito del cliente:", error);
         return res.status(500).json({ msg: "Error al obtener el carrito", error: error.message });
@@ -172,10 +197,14 @@ const updateCantidadProductoController = async (req, res) => {
 };
 
 const removeProductoCarritoController = async (req, res) => {
-    const { producto_id, tipo_producto = "normal" } = req.body;
+    const { producto_id, tipo_producto } = req.body;
     const clienteId = req.clienteBDD._id.toString();
 
-    if (!producto_id || !mongoose.Types.ObjectId.isValid(producto_id.trim())) {
+    if (!producto_id || !tipo_producto) {
+        return res.status(400).json({ msg: "Debes proporcionar producto_id y tipo_producto." });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(producto_id.trim())) {
         return res.status(400).json({ msg: "ID de producto inválido." });
     }
 
@@ -183,17 +212,23 @@ const removeProductoCarritoController = async (req, res) => {
         const carrito = await Carrito.findOne({ cliente_id: clienteId });
         if (!carrito) return res.status(404).json({ msg: "Carrito no encontrado." });
 
+        const productosIniciales = carrito.productos.length;
+
         carrito.productos = carrito.productos.filter(
             (p) => p.producto_id.toString() !== producto_id || p.tipo_producto !== tipo_producto
         );
 
+        if (carrito.productos.length === productosIniciales) {
+            return res.status(404).json({ msg: "El producto no fue encontrado en el carrito con ese tipo." });
+        }
+
         carrito.total = parseFloat(carrito.productos.reduce((acc, p) => acc + p.subtotal, 0).toFixed(2));
         await carrito.save();
 
-        res.status(200).json({ msg: "Producto eliminado del carrito", carrito });
+        return res.status(200).json({ msg: "Producto eliminado del carrito", carrito });
     } catch (error) {
         console.error("Error al eliminar producto del carrito:", error);
-        res.status(500).json({ msg: "Error interno del servidor" });
+        return res.status(500).json({ msg: "Error interno del servidor" });
     }
 };
 
