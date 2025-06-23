@@ -184,7 +184,7 @@ const updateProductoController = async (req, res) => {
     descripcion,
     precio,
     stock,
-    categoria,
+    id_categoria,
     beneficios,
     ingredientes,
     aroma,
@@ -223,8 +223,8 @@ const updateProductoController = async (req, res) => {
     if (!producto) return res.status(404).json({ msg: "Producto no encontrado" });
     if (!producto.activo) return res.status(400).json({ msg: "El producto está desactivado" });
 
-    if (categoria) {
-      const cat = await Categoria.findById(categoria);
+    if (id_categoria) {
+      const cat = await Categoria.findById(id_categoria);
       if (!cat) return res.status(404).json({ msg: "Categoría no encontrada" });
 
       const nombreCategoria = cat.nombre.toLowerCase();
@@ -249,7 +249,7 @@ const updateProductoController = async (req, res) => {
       descripcion: descripcion?.trim() || producto.descripcion,
       precio: precio || producto.precio,
       stock: stock !== undefined ? stock : producto.stock,
-      id_categoria: categoria || producto.id_categoria,
+      id_categoria: id_categoria !== undefined ? id_categoria : producto.id_categoria,
       aroma: aroma?.trim() || producto.aroma,
       tipo: tipo?.trim() || producto.tipo,
       beneficios: Array.isArray(beneficios) && beneficios.length > 0 ? beneficios : producto.beneficios,
