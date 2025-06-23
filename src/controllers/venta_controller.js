@@ -1,7 +1,6 @@
 import Ventas from "../models/ventas.js";
 import Producto from "../models/productos.js";
 import Clientes from "../models/clientes.js";
-import Carrito from "../models/carritos.js";
 import mongoose from "mongoose";
 
 // Obtener todas las ventas
@@ -234,8 +233,8 @@ const getFacturaClienteById = async (req, res) => {
     res.status(200).json({ factura });
 
   } catch (error) {
-    console.error("Error al obtener factura del cliente:", error);
-    res.status(500).json({ msg: "Error interno del servidor" });
+    console.error("❌ getFacturaClienteById:", error);
+    return res.status(500).json({ msg: "Error interno", error: error.message });
   }
 };
 

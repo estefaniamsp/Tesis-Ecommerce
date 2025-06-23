@@ -252,7 +252,7 @@ const cambiarContraseniaController = async (req, res) => {
 
         await admin.save();
 
-        res.json({ msg: "Contraseña cambiada con éxito" });
+        return res.status(200).json({ msg: "Contraseña cambiada con éxito" });
     } catch (error) {
         console.error(error);
         res.status(500).json({ msg: "Error al cambiar la contraseña" });

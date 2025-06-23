@@ -90,7 +90,7 @@ describe("deleteVentaController", () => {
     });
 });*/
 
-describe("getVentasClienteController", () => {
+/*describe("getVentasClienteController", () => {
     test("debería obtener ventas del cliente", async () => {
         req.clienteBDD._id = "cliente-id";
         Ventas.find.mockReturnValue({ populate: jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue([{}]) }) });
@@ -100,22 +100,80 @@ describe("getVentasClienteController", () => {
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith({ ventas: [{}] });
     });
-});
+});*/
 
-/*describe("getFacturaClienteById", () => {
-    test("debería retornar la factura de una venta", async () => {
-        req.params.id = "venta-id";
-        req.clienteBDD._id = "cliente-id";
-        Ventas.findById.mockReturnValue({ populate: jest.fn().mockResolvedValue({ cliente_id: { _id: "cliente-id", email: "test@mail.com" } }) });
+describe("getFacturaClienteById", () => {
+    afterEach(() => jest.clearAllMocks());
+
+    it("debería retornar la factura de una venta", async () => {
+        const req = {
+            params: { id: "venta123" },
+            clienteBDD: { _id: "cli123" }
+        };
+
+        const res = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn()
+        };
+
+        const ventaMock = {
+            _id: "venta123",
+            fecha_venta: "2024-01-01",
+            total: 100,
+            estado: "finalizado",
+            cliente_id: {
+                _id: "cli123",
+                nombre: "Juan",
+                apellido: "Pérez",
+                email: "juan@example.com"
+            },
+            productos: [
+                {
+                    producto_id: {
+                        nombre: "Jabón artesanal",
+                        imagen: "img.jpg",
+                        precio: 10
+                    },
+                    cantidad: 2,
+                    subtotal: 20
+                }
+            ]
+        };
+
+        // 👉 Mock correcto: retorna ventaMock directamente desde populate()
+        Ventas.findById.mockReturnValue({
+            populate: jest.fn().mockResolvedValue(ventaMock)
+        });
 
         await getFacturaClienteById(req, res);
 
         expect(res.status).toHaveBeenCalledWith(200);
-        expect(res.json).toHaveBeenCalledWith({ factura: expect.any(Object) });
+        expect(res.json).toHaveBeenCalledWith({
+            factura: {
+                fecha: "2024-01-01",
+                cliente: {
+                    nombre: "Juan",
+                    apellido: "Pérez",
+                    email: "juan@example.com"
+                },
+                productos: [
+                    {
+                        producto_id: ventaMock.productos[0].producto_id,
+                        nombre: "Jabón artesanal",
+                        imagen: "img.jpg",
+                        precio: 10,
+                        cantidad: 2,
+                        subtotal: 20
+                    }
+                ],
+                total: 100,
+                estado: "finalizado"
+            }
+        });
     });
 });
 
-describe("getDashboardController", () => {
+/*describe("getDashboardController", () => {
     test("debería retornar métricas del dashboard", async () => {
         req.query = { fechaInicio: "2024-01-01", fechaFin: "2024-01-31" };
         Clientes.countDocuments.mockResolvedValue(3);

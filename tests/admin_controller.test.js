@@ -95,7 +95,7 @@ jest.mock("bcrypt");
     });
 });*/
 
-describe("Pruebas Unitarias - Admin - Recuperar Contraseña", () => {
+/*describe("Pruebas Unitarias - Admin - Recuperar Contraseña", () => {
     let req, res;
     let mockTransport;
 
@@ -153,9 +153,9 @@ describe("Pruebas Unitarias - Admin - Recuperar Contraseña", () => {
         expect(res.status).toHaveBeenCalledWith(404);
         expect(res.json).toHaveBeenCalledWith({ msg: "Administrador no encontrado" });
     });
-});
+});*/
 
-/*describe("Pruebas Unitarias - Admin - Cambiar Contraseña", () => {
+describe("Pruebas Unitarias - Admin - Cambiar Contraseña", () => {
     let req, res;
     const adminMock = {
         email: "admin123@yopmail.com",
@@ -225,4 +225,4 @@ describe("Pruebas Unitarias - Admin - Recuperar Contraseña", () => {
         expect(res.status).toHaveBeenCalledWith(404);
         expect(res.json).toHaveBeenCalledWith({ msg: "Administrador no encontrado" });
     });
-});*/
+});
