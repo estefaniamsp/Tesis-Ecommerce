@@ -316,7 +316,7 @@ const pagarCarritoController = async (req, res) => {
             cliente_id: cliente._id,
             productos: productosConDetalles,
             total: carrito.total,
-            estado: "finalizado"
+            estado: "pendiente",
         });
         await nuevaVenta.save();
 
