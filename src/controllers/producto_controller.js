@@ -112,8 +112,8 @@ const createProductoController = async (req, res) => {
     return res.status(400).json({ msg: "Todos los campos y la imagen son obligatorios" });
   }
 
-  if (isNaN(precio) || precio < 1 || precio > 1000) {
-    return res.status(400).json({ msg: "El precio debe ser un número entre $1 y $1000." });
+  if (isNaN(precio) || precio < 0 || precio > 1000) {
+    return res.status(400).json({ msg: "El precio debe ser un número entre $0 y $1000." });
   }
 
   if (isNaN(stock) || stock < 0 || stock > 100) {
@@ -145,10 +145,14 @@ const createProductoController = async (req, res) => {
       return res.status(400).json({ msg: "Tipo inválido para 'Velas artesanales'." });
     }
 
-    const productoExistente = await Producto.findOne({ nombre });
+    // Validación robusta de nombre único
+    const productoExistente = await Producto.findOne({
+      nombre: { $regex: `^${nombre}$`, $options: 'i' }
+    });
+
     if (productoExistente) {
       await cloudinary.uploader.destroy(req.file.filename);
-      return res.status(400).json({ msg: "El producto con ese nombre ya existe. Imagen eliminada." });
+      return res.status(400).json({ msg: "Ya existe un producto con ese nombre. Imagen eliminada." });
     }
 
     const nuevoProducto = new Producto({
@@ -196,19 +200,27 @@ const updateProductoController = async (req, res) => {
   }
 
   if (typeof ingredientes === 'string') {
-    try { ingredientes = JSON.parse(ingredientes); } catch { ingredientes = ingredientes.split(',').map(i => i.trim()); }
+    try {
+      ingredientes = JSON.parse(ingredientes);
+    } catch {
+      ingredientes = ingredientes.split(',').map(i => i.trim());
+    }
   }
 
   if (typeof beneficios === 'string') {
-    try { beneficios = JSON.parse(beneficios); } catch { beneficios = beneficios.split(',').map(b => b.trim()); }
+    try {
+      beneficios = JSON.parse(beneficios);
+    } catch {
+      beneficios = beneficios.split(',').map(b => b.trim());
+    }
   }
 
-  if (precio && (isNaN(precio) || precio <= 0)) {
-    return res.status(400).json({ msg: "El precio debe ser un número positivo" });
+  if (precio !== undefined && (isNaN(precio) || precio < 0)) {
+    return res.status(400).json({ msg: "El precio debe ser un número mayor o igual a 0" });
   }
 
-  if (stock && (isNaN(stock) || stock < 0)) {
-    return res.status(400).json({ msg: "El stock debe ser un número positivo o 0" });
+  if (stock !== undefined && (isNaN(stock) || stock < 0)) {
+    return res.status(400).json({ msg: "El stock debe ser un número mayor o igual a 0" });
   }
 
   if (ingredientes && Array.isArray(ingredientes)) {
@@ -223,31 +235,60 @@ const updateProductoController = async (req, res) => {
     if (!producto) return res.status(404).json({ msg: "Producto no encontrado" });
     if (!producto.activo) return res.status(400).json({ msg: "El producto está desactivado" });
 
-    if (id_categoria) {
+    // Validar nombre único si se modifica
+    if (nombre && nombre.trim() !== producto.nombre) {
+      const nombreExistente = await Producto.findOne({
+        _id: { $ne: id },
+        nombre: { $regex: `^${nombre.trim()}$`, $options: 'i' }
+      });
+
+      if (nombreExistente) {
+        return res.status(400).json({ msg: "Ya existe otro producto con ese nombre." });
+      }
+    }
+
+    // Validar cambio de categoría y tipo obligatorio
+    if (
+      id_categoria &&
+      id_categoria.toString() !== producto.id_categoria.toString()
+    ) {
       const cat = await Categoria.findById(id_categoria);
       if (!cat) return res.status(404).json({ msg: "Categoría no encontrada" });
 
       const nombreCategoria = cat.nombre.toLowerCase();
 
-      if (nombreCategoria.includes("jabones") && tipo && !jabonesTipos.includes(tipo.toLowerCase())) {
+      // Si tipo no fue enviado, error
+      if (!tipo) {
+        return res.status(400).json({
+          msg: `Debes enviar un tipo válido para la nueva categoría '${cat.nombre}'.`,
+        });
+      }
+
+      const tipoEvaluar = tipo.trim().toLowerCase();
+
+      // Validar tipo según nueva categoría
+      if (nombreCategoria.includes("jabones") && !jabonesTipos.includes(tipoEvaluar)) {
         return res.status(400).json({ msg: "Tipo inválido para 'Jabones artesanales'." });
       }
 
-      if (nombreCategoria.includes("velas") && tipo && !velasTipos.includes(tipo.toLowerCase())) {
+      if (nombreCategoria.includes("velas") && !velasTipos.includes(tipoEvaluar)) {
         return res.status(400).json({ msg: "Tipo inválido para 'Velas artesanales'." });
       }
     }
 
-    if (req.file) {
-      if (producto.imagen_id) {
-        try { await cloudinary.uploader.destroy(producto.imagen_id); } catch (e) { console.warn("Error al eliminar imagen previa:", e.message); }
+    // Reemplazar imagen anterior si se subió una nueva
+    if (req.file && producto.imagen_id) {
+      try {
+        await cloudinary.uploader.destroy(producto.imagen_id);
+      } catch (e) {
+        console.warn("Error al eliminar imagen previa:", e.message);
       }
     }
 
     const camposActualizados = {
       nombre: nombre?.trim() || producto.nombre,
       descripcion: descripcion?.trim() || producto.descripcion,
-      precio: precio || producto.precio,
+      precio: precio !== undefined ? precio : producto.precio,
       stock: stock !== undefined ? stock : producto.stock,
       id_categoria: id_categoria !== undefined ? id_categoria : producto.id_categoria,
       aroma: aroma?.trim() || producto.aroma,
@@ -264,11 +305,19 @@ const updateProductoController = async (req, res) => {
     const productoActualizado = await Producto.findByIdAndUpdate(
       id,
       { $set: camposActualizados },
-      { new: true, runValidators: true }).populate("ingredientes", "nombre");
-    return res.status(200).json({ msg: "Producto actualizado exitosamente", producto: productoActualizado });
+      { new: true, runValidators: true }
+    ).populate("ingredientes", "nombre");
+
+    return res.status(200).json({
+      msg: "Producto actualizado exitosamente",
+      producto: productoActualizado
+    });
   } catch (error) {
     console.error("Error al actualizar producto:", error);
-    return res.status(500).json({ msg: "Error al actualizar el producto", error: error.message });
+    return res.status(500).json({
+      msg: "Error al actualizar el producto",
+      error: error.message
+    });
   }
 };
 

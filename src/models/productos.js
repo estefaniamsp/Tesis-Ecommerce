@@ -6,6 +6,7 @@ const productoSchema = new Schema(
       type: String,
       required: true,
       maxLength: 100,
+      unique: true,
       trim: true,
     },
     descripcion: {
