@@ -37,19 +37,7 @@ const productoPersonalizadoSchema = new Schema(
             required: true,
             maxLength: 100,
             trim: true,
-        },
-        tipo_producto: {
-            type: String,
-            enum: [
-                "piel seca",
-                "piel grasa",
-                "piel mixta",
-                "decorativa",
-                "aromatizante",
-                "humidificación",
-            ],
-            required: true,
-        },
+        }
     },
     {
         timestamps: true,
@@ -61,46 +49,6 @@ const productoPersonalizadoSchema = new Schema(
         },
     }
 );
-
-// Validación condicional de tipo_producto según categoría
-productoPersonalizadoSchema.pre("save", async function (next) {
-    const jabonesTipos = ["piel seca", "piel grasa", "piel mixta"];
-    const velasTipos = ["decorativa", "aromatizante", "humidificación"];
-
-    try {
-        const categoria = await mongoose
-            .model("Categorias")
-            .findById(this.id_categoria);
-
-        if (!categoria) {
-            return next(new Error("Categoría no encontrada."));
-        }
-
-        const nombreCategoria = categoria.nombre.toLowerCase();
-
-        if (
-            nombreCategoria.includes("jabones") &&
-            !jabonesTipos.includes(this.tipo_producto)
-        ) {
-            return next(
-                new Error("Tipo de producto inválido para la categoría 'Jabones artesanales'.")
-            );
-        }
-
-        if (
-            nombreCategoria.includes("velas") &&
-            !velasTipos.includes(this.tipo_producto)
-        ) {
-            return next(
-                new Error("Tipo de producto inválido para la categoría 'Velas artesanales'.")
-            );
-        }
-
-        next();
-    } catch (error) {
-        next(error);
-    }
-});
 
 const ProductoPersonalizado = model("ProductosPersonalizados", productoPersonalizadoSchema);
 

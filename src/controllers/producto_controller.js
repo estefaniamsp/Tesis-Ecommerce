@@ -199,6 +199,7 @@ const updateProductoController = async (req, res) => {
     return res.status(400).json({ msg: "ID de producto no válido" });
   }
 
+  // Parsear ingredientes si llegan como string
   if (typeof ingredientes === 'string') {
     try {
       ingredientes = JSON.parse(ingredientes);
@@ -207,12 +208,18 @@ const updateProductoController = async (req, res) => {
     }
   }
 
+  // Parsear beneficios si llegan como string
   if (typeof beneficios === 'string') {
     try {
       beneficios = JSON.parse(beneficios);
     } catch {
       beneficios = beneficios.split(',').map(b => b.trim());
     }
+  }
+
+  // Si beneficios es un array vacío, no actualizar
+  if (Array.isArray(beneficios) && beneficios.length === 0) {
+    beneficios = undefined;
   }
 
   if (precio !== undefined && (isNaN(precio) || precio < 0)) {
@@ -266,7 +273,6 @@ const updateProductoController = async (req, res) => {
 
       const tipoEvaluar = tipo.trim().toLowerCase();
 
-      // Validar tipo según nueva categoría
       if (nombreCategoria.includes("jabones") && !jabonesTipos.includes(tipoEvaluar)) {
         return res.status(400).json({ msg: "Tipo inválido para 'Jabones artesanales'." });
       }
@@ -293,7 +299,7 @@ const updateProductoController = async (req, res) => {
       id_categoria: id_categoria !== undefined ? id_categoria : producto.id_categoria,
       aroma: aroma?.trim() || producto.aroma,
       tipo: tipo?.trim() || producto.tipo,
-      beneficios: Array.isArray(beneficios) && beneficios.length > 0 ? beneficios : producto.beneficios,
+      beneficios: beneficios !== undefined ? beneficios : producto.beneficios,
       ingredientes: Array.isArray(ingredientes) && ingredientes.length > 0 ? ingredientes : producto.ingredientes,
     };
 

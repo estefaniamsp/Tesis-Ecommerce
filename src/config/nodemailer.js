@@ -26,7 +26,7 @@ const sendMailToUser = (userMail, token) => {
       Gracias por registrarte. Para activar tu cuenta, por favor haz clic en el botón de abajo:
     </p>
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${process.env.URL_BACKEND}confirmarCliente/${encodeURIComponent(token)}" 
+      <a href="${process.env.URL_FRONTEND}confirmar-email/${encodeURIComponent(token)}" 
          style="background-color: #27ae60; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-size: 16px;">
         Confirmar cuenta
       </a>
@@ -53,7 +53,7 @@ const sendMailToUserAdmin = (userMail, token) => {
         from: process.env.USER_MAILTRAP,
         to: userMail,
         subject: "Verifica tu cuenta",
-        html: `<p>Hola, haz clic <a href="${process.env.URL_BACKEND}confirmarAdmin/${encodeURIComponent(token)}">aquí</a> para confirmar tu cuenta.</p>`
+        html: `<p>Hola, haz clic <a href="${process.env.URL_FRONTEND}confirmar-email/${encodeURIComponent(token)}">aquí</a> para confirmar tu cuenta.</p>`
     };
 
 
