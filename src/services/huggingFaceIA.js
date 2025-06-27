@@ -6,7 +6,7 @@ import { HfInference } from "@huggingface/inference";
 
 const hf = new HfInference(process.env.TOKEN_HUGGINGFACE);
 
-async function recomendarProductoConHF(clienteId, tipo, id_categoria) {
+async function recomendarProductoConHF(clienteId, id_categoria) {
   const categoria = await Categoria.findById(id_categoria);
   if (!categoria) throw new Error("La categoría indicada no existe.");
 
@@ -42,7 +42,7 @@ async function recomendarProductoConHF(clienteId, tipo, id_categoria) {
     .join('\n');
 
   let prompt = `
-El cliente desea un producto de tipo "${tipo}" en la categoría "${categoria.nombre}".
+El cliente desea un producto en la categoría "${categoria.nombre}".
 
 Ingredientes disponibles (agrupados por tipo):
 ${listaIngredientes}
@@ -129,7 +129,6 @@ Solo responde el objeto JSON. Usa solo ingredientes disponibles. Máximo 150 tok
     msg: "Producto personalizado creado exitosamente",
     producto_personalizado: {
       categoria: categoria.nombre.toLowerCase(),
-      tipo: tipo,
       aroma: aroma && {
         _id: aroma._id,
         nombre: aroma.nombre,

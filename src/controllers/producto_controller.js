@@ -391,47 +391,24 @@ const personalizarProductoIAController = async (req, res) => {
       return res.status(403).json({ msg: "Solo los clientes pueden personalizar productos con IA." });
     }
 
-    const { tipo, id_categoria } = req.body;
+    const { id_categoria } = req.body;
 
-    if (!tipo || !id_categoria) {
-      return res.status(400).json({ msg: "El tipo y la categoría son obligatorios." });
+    if (!id_categoria) {
+      return res.status(400).json({ msg: "La categoría es obligatoria." });
     }
 
-    const recomendacion = await recomendarProductoConHF(req.clienteBDD._id, tipo, id_categoria);
+    const recomendacion = await recomendarProductoConHF(req.clienteBDD._id, id_categoria);
 
     const productoIA = recomendacion?.producto_personalizado;
     if (!productoIA) {
       return res.status(400).json({ msg: "La IA no devolvió un producto válido.", raw: recomendacion });
     }
 
-    // Extraer IDs de ingredientes
-    const ingredientes = [
-      productoIA.molde._id,
-      productoIA.color._id,
-      productoIA.aroma._id,
-      productoIA.esencias[0]._id,
-      productoIA.esencias[1]._id,
-    ];
-
-    // Guardar el producto en la base de datos
-    const nuevoProducto = new ProductoPersonalizado({
-      cliente_id: req.clienteBDD._id,
-      tipo_producto: productoIA.tipo,
-      id_categoria,
-      ingredientes,
-      precio: productoIA.precio,
-      aroma: productoIA.aroma.nombre,
-    });
-
-    await nuevoProducto.save();
-
-    return res.status(201).json({
-      msg: "Producto generado por IA creado y guardado exitosamente.",
-      producto_id: nuevoProducto._id,
-      tipo_producto: "ia",
+    // Devuelve la recomendación sin guardar en la base de datos
+    return res.status(200).json({
+      msg: "Producto recomendado por IA generado exitosamente.",
       producto_personalizado: {
         ...productoIA,
-        _id: nuevoProducto._id,
         origen: "ia"
       }
     });
@@ -441,6 +418,7 @@ const personalizarProductoIAController = async (req, res) => {
     return res.status(500).json({ msg: "Error al personalizar producto con IA", error: error.message });
   }
 };
+
 
 export {
   createProductoController,

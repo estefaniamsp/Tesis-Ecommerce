@@ -72,11 +72,11 @@ const createProductoPersonalizadoController = async (req, res) => {
             return res.status(403).json({ msg: "Solo los clientes pueden crear productos personalizados." });
         }
 
-        let { ingredientes, tipo_producto, id_categoria } = req.body;
+        let { ingredientes, id_categoria } = req.body;
 
-        if (!ingredientes || !tipo_producto || !id_categoria) {
+        if (!ingredientes || !id_categoria) {
             return res.status(400).json({
-                msg: "Todos los campos son obligatorios: ingredientes, tipo_producto y categoría.",
+                msg: "Los campos obligatorios son: ingredientes y categoría.",
                 camposRecibidos: req.body,
             });
         }
@@ -90,19 +90,6 @@ const createProductoPersonalizadoController = async (req, res) => {
 
         if (!mongoose.Types.ObjectId.isValid(id_categoria)) {
             return res.status(400).json({ msg: "ID de categoría no válido." });
-        }
-
-        const productoExistente = await ProductoPersonalizado.findOne({
-            cliente_id: req.clienteBDD._id,
-            tipo_producto: tipo_producto.trim().toLowerCase(),
-            id_categoria,
-            ingredientes: { $all: ingredientes, $size: ingredientes.length }
-        });
-
-        if (productoExistente) {
-            return res.status(409).json({
-                msg: "Ya tienes un producto personalizado con estos mismos ingredientes y tipo."
-            });
         }
 
         const ingredientesEnBD = await Ingrediente.find({ _id: { $in: ingredientes } });
@@ -136,11 +123,7 @@ const createProductoPersonalizadoController = async (req, res) => {
             }
             idsUnicos.add(ing._id.toString());
 
-            const data = {
-                _id: ing._id,
-                nombre: ing.nombre,
-                imagen: ing.imagen
-            };
+            const data = { _id: ing._id, nombre: ing.nombre, imagen: ing.imagen };
 
             if (tipo === "molde") {
                 if (molde) return res.status(400).json({ msg: "Solo se permite un molde." });
@@ -167,12 +150,23 @@ const createProductoPersonalizadoController = async (req, res) => {
             return res.status(400).json({ msg: "Validación de ingredientes fallida.", errores });
         }
 
+        const productoExistente = await ProductoPersonalizado.findOne({
+            cliente_id: req.clienteBDD._id,
+            id_categoria,
+            ingredientes: { $all: ingredientes, $size: ingredientes.length }
+        });
+
+        if (productoExistente) {
+            return res.status(409).json({
+                msg: "Ya tienes un producto personalizado con estos mismos ingredientes."
+            });
+        }
+
         const precio = ingredientesEnBD.reduce((acc, ing) => acc + ing.precio, 0);
 
         const nuevoProducto = new ProductoPersonalizado({
             cliente_id: req.clienteBDD._id,
             ingredientes,
-            tipo_producto: tipo_producto.trim().toLowerCase(),
             id_categoria,
             precio,
             aroma: aroma.nombre,
@@ -186,7 +180,6 @@ const createProductoPersonalizadoController = async (req, res) => {
             producto_personalizado: {
                 _id: nuevoProducto._id,
                 categoria: nuevoProducto.id_categoria?.nombre?.toLowerCase() || "desconocida",
-                tipo: nuevoProducto.tipo_producto,
                 aroma: aroma.nombre,
                 molde,
                 color,
@@ -229,7 +222,6 @@ const updateProductoPersonalizadoController = async (req, res) => {
         const duplicado = await ProductoPersonalizado.findOne({
             _id: { $ne: id },
             cliente_id: req.clienteBDD._id,
-            tipo_producto: producto.tipo_producto,
             id_categoria: producto.id_categoria,
             aroma: producto.aroma,
             ingredientes: { $all: ingredientes, $size: ingredientes.length },
@@ -300,7 +292,6 @@ const updateProductoPersonalizadoController = async (req, res) => {
             producto_personalizado: {
                 _id: producto._id,
                 categoría: categoria?.nombre || "Sin categoría",
-                tipo: producto.tipo_producto,
                 aroma: producto.aroma,
                 molde,
                 color,
