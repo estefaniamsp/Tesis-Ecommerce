@@ -126,12 +126,21 @@ const updatePromocionController = async (req, res) => {
             return res.status(404).json({ msg: "Promoción no encontrada" });
         }
 
-        // Si hay nuevo nombre, verificar que no se repita
+        // Si hay nuevo nombre, validar longitud y unicidad
         if (nombre !== undefined) {
             nombre = nombre.trim().toLowerCase();
 
+            if (nombre.length < 3 || nombre.length > 50) {
+                if (req.file?.filename) {
+                    await cloudinary.uploader.destroy(req.file.filename);
+                }
+                return res.status(400).json({
+                    msg: "El nombre debe tener entre 3 y 50 caracteres.",
+                });
+            }
+
             const nombreExistente = await Promocion.findOne({
-                _id: { $ne: id }, // distinto al actual
+                _id: { $ne: id },
                 nombre: { $regex: new RegExp(`^${nombre}$`, "i") },
             });
 
