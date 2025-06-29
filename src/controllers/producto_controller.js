@@ -106,14 +106,25 @@ const createProductoController = async (req, res) => {
   aroma = aroma?.trim();
   tipo = tipo?.trim();
 
-  beneficios = !beneficios ? [] : typeof beneficios === "string" ? [beneficios] : beneficios;
+  // Parseo y limpieza de beneficios
+  if (typeof beneficios === "string") {
+    try {
+      beneficios = JSON.parse(beneficios);
+    } catch {
+      beneficios = beneficios.split(',').map(b => b.trim()).filter(Boolean);
+    }
+  }
+
+  if (!Array.isArray(beneficios) || beneficios.length < 3) {
+    return res.status(400).json({ msg: "Debes proporcionar al menos 3 beneficios no vacíos." });
+  }
 
   if (!nombre || !descripcion || !precio || !stock || !id_categoria || !aroma || !tipo || !req.file) {
     return res.status(400).json({ msg: "Todos los campos y la imagen son obligatorios" });
   }
 
   if (isNaN(precio) || precio < 0 || precio > 1000) {
-    return res.status(400).json({ msg: "El precio debe ser un número entre $0 y $1000." });
+    return res.status(400).json({ msg: "El precio debe ser un número entre $0 y $100." });
   }
 
   if (isNaN(stock) || stock < 0 || stock > 100) {
@@ -145,14 +156,13 @@ const createProductoController = async (req, res) => {
       return res.status(400).json({ msg: "Tipo inválido para 'Velas artesanales'." });
     }
 
-    // Validación robusta de nombre único
     const productoExistente = await Producto.findOne({
       nombre: { $regex: `^${nombre}$`, $options: 'i' }
     });
 
     if (productoExistente) {
       await cloudinary.uploader.destroy(req.file.filename);
-      return res.status(400).json({ msg: "Ya existe un producto con ese nombre. Imagen eliminada." });
+      return res.status(400).json({ msg: "Ya existe un producto con ese nombre." });
     }
 
     const nuevoProducto = new Producto({
@@ -199,7 +209,7 @@ const updateProductoController = async (req, res) => {
     return res.status(400).json({ msg: "ID de producto no válido" });
   }
 
-  // Parsear ingredientes si llegan como string
+  // Parsear ingredientes
   if (typeof ingredientes === 'string') {
     try {
       ingredientes = JSON.parse(ingredientes);
@@ -208,7 +218,7 @@ const updateProductoController = async (req, res) => {
     }
   }
 
-  // Parsear beneficios si llegan como string
+  // Parsear beneficios
   if (typeof beneficios === 'string') {
     try {
       beneficios = JSON.parse(beneficios);
@@ -217,9 +227,14 @@ const updateProductoController = async (req, res) => {
     }
   }
 
-  // Si beneficios es un array vacío, no actualizar
-  if (Array.isArray(beneficios) && beneficios.length === 0) {
-    beneficios = undefined;
+  // Limpiar array de beneficios vacíos si ya viene como array
+  if (Array.isArray(beneficios)) {
+    beneficios = beneficios.map(b => b.trim()).filter(b => b.length > 0);
+  }
+
+  // Validar mínimo 3 beneficios si se están enviando
+  if (beneficios !== undefined && beneficios.length < 3) {
+    return res.status(400).json({ msg: "Debes proporcionar al menos 3 beneficios no vacíos." });
   }
 
   if (precio !== undefined && (isNaN(precio) || precio < 0)) {
@@ -242,19 +257,18 @@ const updateProductoController = async (req, res) => {
     if (!producto) return res.status(404).json({ msg: "Producto no encontrado" });
     if (!producto.activo) return res.status(400).json({ msg: "El producto está desactivado" });
 
-    // Validar nombre único si se modifica
+    // Validar nombre único si se cambia
     if (nombre && nombre.trim() !== producto.nombre) {
       const nombreExistente = await Producto.findOne({
         _id: { $ne: id },
         nombre: { $regex: `^${nombre.trim()}$`, $options: 'i' }
       });
-
       if (nombreExistente) {
         return res.status(400).json({ msg: "Ya existe otro producto con ese nombre." });
       }
     }
 
-    // Validar cambio de categoría y tipo obligatorio
+    // Validar tipo si cambia de categoría
     if (
       id_categoria &&
       id_categoria.toString() !== producto.id_categoria.toString()
@@ -264,7 +278,6 @@ const updateProductoController = async (req, res) => {
 
       const nombreCategoria = cat.nombre.toLowerCase();
 
-      // Si tipo no fue enviado, error
       if (!tipo) {
         return res.status(400).json({
           msg: `Debes enviar un tipo válido para la nueva categoría '${cat.nombre}'.`,
@@ -272,7 +285,6 @@ const updateProductoController = async (req, res) => {
       }
 
       const tipoEvaluar = tipo.trim().toLowerCase();
-
       if (nombreCategoria.includes("jabones") && !jabonesTipos.includes(tipoEvaluar)) {
         return res.status(400).json({ msg: "Tipo inválido para 'Jabones artesanales'." });
       }
@@ -282,7 +294,7 @@ const updateProductoController = async (req, res) => {
       }
     }
 
-    // Reemplazar imagen anterior si se subió una nueva
+    // Reemplazar imagen si se envió una nueva
     if (req.file && producto.imagen_id) {
       try {
         await cloudinary.uploader.destroy(producto.imagen_id);

@@ -84,7 +84,7 @@ const createIngredienteController = async (req, res) => {
         const ingredienteExistente = await Ingrediente.findOne({ nombre: { $regex: new RegExp(`^${nombre}$`, "i") } });
         if (ingredienteExistente) {
             await cloudinary.uploader.destroy(req.file.filename);
-            return res.status(400).json({ msg: "Ya existe un ingrediente con ese nombre. Imagen eliminada." });
+            return res.status(400).json({ msg: "Ya existe un ingrediente con ese nombre." });
         }
 
         const nuevoIngrediente = new Ingrediente({

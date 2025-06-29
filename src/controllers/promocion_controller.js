@@ -82,7 +82,7 @@ const createPromocionController = async (req, res) => {
         if (promocionExistente) {
             await cloudinary.uploader.destroy(req.file.filename);
             return res.status(400).json({
-                msg: "La promoción ya existe. Imagen eliminada.",
+                msg: "La promoción ya existe.",
             });
         }
 
