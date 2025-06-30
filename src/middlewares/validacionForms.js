@@ -104,7 +104,7 @@ export const validarClientePerfil = [
     check("direccion")
         .optional()
         .isLength({ min: 5, max: 30 })
-        .withMessage("La dirección debe tener entre 5 y 30 caracteres."),
+        .withMessage("La dirección debe tener entre 10 y 50 caracteres."),
 
     check("telefono")
         .optional()

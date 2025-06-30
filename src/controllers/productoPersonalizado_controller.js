@@ -2,6 +2,7 @@ import ProductoPersonalizado from "../models/productosPersonalizados.js";
 import Ingrediente from "../models/ingredientes.js";
 import mongoose from "mongoose";
 import cloudinary from "../config/cloudinary.js";
+import { recomendarProductoConHF } from "../services/huggingFaceIA.js";
 
 // Obtener todos los productos personalizados del usuario autenticado
 const getAllProductosPersonalizadosController = async (req, res) => {
@@ -362,7 +363,6 @@ const updateImagenProductoPersonalizadoController = async (req, res) => {
 // Eliminar un producto personalizado
 const deleteProductoPersonalizadoController = async (req, res) => {
     try {
-
         if (!req.clienteBDD) {
             return res.status(403).json({ msg: "Solo los clientes pueden eliminar productos personalizados." });
         }
@@ -384,6 +384,7 @@ const deleteProductoPersonalizadoController = async (req, res) => {
             return res.status(403).json({ msg: "No tienes permiso para eliminar este producto." });
         }
 
+        // Eliminar imagen de Cloudinary si existe
         if (producto.imagen_id) {
             try {
                 await cloudinary.uploader.destroy(producto.imagen_id);
@@ -392,13 +393,54 @@ const deleteProductoPersonalizadoController = async (req, res) => {
             }
         }
 
+        // Eliminar el producto personalizado
         await producto.deleteOne();
 
-        return res.status(200).json({ msg: "Producto personalizado eliminado correctamente" });
+        // Eliminar referencias en carritos
+        await Carrito.updateMany(
+            { "productos.producto_id": producto._id },
+            { $pull: { productos: { producto_id: producto._id } } }
+        );
+
+        return res.status(200).json({ msg: "Producto personalizado eliminado correctamente y eliminado de los carritos." });
 
     } catch (error) {
         console.error("Error al eliminar producto personalizado:", error);
         return res.status(500).json({ msg: "Error al eliminar el producto", error: error.message });
+    }
+};
+
+const personalizarProductoIAController = async (req, res) => {
+    try {
+        if (!req.clienteBDD) {
+            return res.status(403).json({ msg: "Solo los clientes pueden personalizar productos con IA." });
+        }
+
+        const { id_categoria } = req.body;
+
+        if (!id_categoria) {
+            return res.status(400).json({ msg: "La categoría es obligatoria." });
+        }
+
+        const recomendacion = await recomendarProductoConHF(req.clienteBDD._id, id_categoria);
+
+        const productoIA = recomendacion?.producto_personalizado;
+        if (!productoIA) {
+            return res.status(400).json({ msg: "La IA no devolvió un producto válido.", raw: recomendacion });
+        }
+
+        // Devuelve la recomendación sin guardar en la base de datos
+        return res.status(200).json({
+            msg: "Producto recomendado por IA generado exitosamente.",
+            producto_personalizado: {
+                ...productoIA,
+                origen: "ia"
+            }
+        });
+
+    } catch (error) {
+        console.error("Error al personalizar producto con IA:", error.message || error);
+        return res.status(500).json({ msg: "Error al personalizar producto con IA", error: error.message });
     }
 };
 
@@ -409,4 +451,5 @@ export {
     updateProductoPersonalizadoController,
     updateImagenProductoPersonalizadoController,
     deleteProductoPersonalizadoController,
+    personalizarProductoIAController
 };

@@ -307,6 +307,7 @@ const pagarCarritoController = async (req, res) => {
 
             productosConDetalles.push({
                 producto_id: producto._id,
+                producto,
                 cantidad: item.cantidad,
                 subtotal: item.subtotal,
             });
@@ -319,13 +320,14 @@ const pagarCarritoController = async (req, res) => {
             estado: "pendiente",
         });
         await nuevaVenta.save();
+        await nuevaVenta.populate("productos.producto_id", "nombre descripcion imagen precio");
 
         carrito.productos = [];
         carrito.total = 0;
         carrito.estado = "pendiente";
         await carrito.save();
 
-        return res.status(200).json({ msg: "Pago exitoso.", venta: nuevaVenta });
+        return res.status(200).json({ msg: "Pago exitoso.", venta: nuevaVenta, cliente });
     } catch (error) {
         console.error("Error al pagar el carrito:", error);
         await Carrito.updateOne({ cliente_id: clienteId }, { estado: "pendiente" });

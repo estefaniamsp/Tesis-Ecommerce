@@ -2,10 +2,8 @@ import Producto from "../models/productos.js";
 import Ingrediente from "../models/ingredientes.js";
 import Categoria from "../models/categorias.js";
 import VistaProducto from "../models/vistaProducto.js";
-import ProductoPersonalizado from "../models/productosPersonalizados.js";
 import mongoose from "mongoose";
 import cloudinary from "../config/cloudinary.js";
-import { recomendarProductoConHF } from "../services/huggingFaceIA.js";
 
 const jabonesTipos = ["piel seca", "piel grasa", "piel mixta"];
 const velasTipos = ["decorativa", "aromatizante", "humidificación"];
@@ -397,47 +395,11 @@ const reactivarProductoController = async (req, res) => {
   }
 };
 
-const personalizarProductoIAController = async (req, res) => {
-  try {
-    if (!req.clienteBDD) {
-      return res.status(403).json({ msg: "Solo los clientes pueden personalizar productos con IA." });
-    }
-
-    const { id_categoria } = req.body;
-
-    if (!id_categoria) {
-      return res.status(400).json({ msg: "La categoría es obligatoria." });
-    }
-
-    const recomendacion = await recomendarProductoConHF(req.clienteBDD._id, id_categoria);
-
-    const productoIA = recomendacion?.producto_personalizado;
-    if (!productoIA) {
-      return res.status(400).json({ msg: "La IA no devolvió un producto válido.", raw: recomendacion });
-    }
-
-    // Devuelve la recomendación sin guardar en la base de datos
-    return res.status(200).json({
-      msg: "Producto recomendado por IA generado exitosamente.",
-      producto_personalizado: {
-        ...productoIA,
-        origen: "ia"
-      }
-    });
-
-  } catch (error) {
-    console.error("Error al personalizar producto con IA:", error.message || error);
-    return res.status(500).json({ msg: "Error al personalizar producto con IA", error: error.message });
-  }
-};
-
-
 export {
   createProductoController,
   getAllProductosController,
   getProductoByIDController,
   updateProductoController,
   deleteProductoController,
-  reactivarProductoController,
-  personalizarProductoIAController
+  reactivarProductoController
 };
