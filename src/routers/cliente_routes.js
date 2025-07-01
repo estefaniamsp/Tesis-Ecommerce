@@ -29,7 +29,7 @@ router.put("/perfil", verificarAutenticacion, (req, res, next) => {req.folderNam
 router.get("/perfil", verificarAutenticacion, getClienteProfile);
 router.post("/recuperar-contrasenia", recuperarContrasenia);
 router.post("/cambiar-contrasenia", validarCambioContraseniaCliente, manejarErrores, cambiarContrasenia);
-router.get("/confirmar-email/:token", confirmEmail);
+router.get("/cliente/confirmar-email/:token", confirmEmail);
 
 // Rutas privadas (solo para administradores)
 router.get("/admin/clientes", verificarAuthAdmin, getAllClientes);

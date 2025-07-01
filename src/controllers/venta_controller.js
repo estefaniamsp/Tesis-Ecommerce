@@ -1,40 +1,82 @@
 import Ventas from "../models/ventas.js";
 import Producto from "../models/productos.js";
 import Clientes from "../models/clientes.js";
+import ProductoPersonalizado from "../models/productosPersonalizados.js";
 import mongoose from "mongoose";
 
 // Obtener todas las ventas
 const getAllVentasController = async (req, res) => {
   try {
-    // Extraer y convertir los parámetros de consulta
     let page = parseInt(req.query.page, 10) || 1;
     let limit = parseInt(req.query.limit, 10) || 10;
-
-    // Validar que 'page' y 'limit' sean números enteros positivos
     if (page < 1) page = 1;
     if (limit < 1) limit = 10;
-
     const skip = (page - 1) * limit;
 
-    // Obtener las ventas con paginación y población de referencias
-    const ventas = await Ventas.find()
+    const ventasRaw = await Ventas.find()
       .populate("cliente_id", "nombre apellido email")
-      .populate("productos.producto_id", "nombre descripcion imagen precio")
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .sort({ fecha_venta: -1 });
 
-    // Contar el total de ventas
     const totalVentas = await Ventas.countDocuments();
-
-    // Calcular el total de páginas
     const totalPaginas = Math.ceil(totalVentas / limit);
 
-    // Verificar si se encontraron ventas
-    if (ventas.length === 0) {
+    if (ventasRaw.length === 0) {
       return res.status(404).json({ msg: "No se encontraron ventas" });
     }
 
-    // Responder con las ventas y la información de paginación
+    const ventas = [];
+
+    for (const venta of ventasRaw) {
+      const productos = [];
+
+      for (const item of venta.productos) {
+        let producto = await Producto.findById(item.producto_id);
+        if (producto) {
+          productos.push({
+            producto_id: producto._id,
+            nombre: producto.nombre,
+            imagen: producto.imagen,
+            precio: producto.precio,
+            cantidad: item.cantidad,
+            subtotal: item.subtotal
+          });
+        } else {
+          const personalizado = await ProductoPersonalizado.findById(item.producto_id)
+            .populate("ingredientes", "nombre imagen")
+            .populate("id_categoria", "nombre");
+
+          if (personalizado) {
+            productos.push({
+              producto_id: personalizado._id,
+              tipo: "personalizado",
+              aroma: personalizado.aroma,
+              imagen: personalizado.imagen,
+              precio: personalizado.precio,
+              categoria: personalizado.id_categoria?.nombre || "sin categoría",
+              ingredientes: personalizado.ingredientes?.map(i => ({
+                _id: i._id,
+                nombre: i.nombre,
+                imagen: i.imagen
+              })),
+              cantidad: item.cantidad,
+              subtotal: item.subtotal
+            });
+          }
+        }
+      }
+
+      ventas.push({
+        _id: venta._id,
+        cliente: venta.cliente_id,
+        fecha_venta: venta.fecha_venta,
+        total: venta.total,
+        estado: venta.estado,
+        productos
+      });
+    }
+
     return res.status(200).json({
       totalVentas,
       totalPaginas,
@@ -50,29 +92,70 @@ const getAllVentasController = async (req, res) => {
 // Obtener una venta por su ID
 const getVentaByIDController = async (req, res) => {
   const { id } = req.params;
+
   try {
     const venta = await Ventas.findById(id)
-      .populate("cliente_id", "nombre apellido email")
-      .populate("productos.producto_id", "nombre descripcion imagen precio")
+      .populate("cliente_id", "nombre apellido email");
 
     if (!venta) {
       return res.status(404).json({ msg: "Venta no encontrada" });
     }
 
-    // Formatear la respuesta para que el frontend reciba campos claros
+    const productos = [];
+
+    for (const item of venta.productos) {
+      let producto = await Producto.findById(item.producto_id);
+
+      if (producto) {
+        productos.push({
+          producto_id: producto._id,
+          tipo: "normal",
+          nombre: producto.nombre,
+          descripcion: producto.descripcion,
+          imagen: producto.imagen,
+          precio: producto.precio,
+          cantidad: item.cantidad,
+          subtotal: item.subtotal
+        });
+      } else {
+        const personalizado = await ProductoPersonalizado.findById(item.producto_id)
+          .populate("ingredientes", "nombre imagen")
+          .populate("id_categoria", "nombre");
+
+        if (personalizado) {
+          productos.push({
+            producto_id: personalizado._id,
+            tipo: "personalizado",
+            aroma: personalizado.aroma,
+            imagen: personalizado.imagen,
+            precio: personalizado.precio,
+            categoria: personalizado.id_categoria?.nombre || "sin categoría",
+            ingredientes: personalizado.ingredientes?.map(i => ({
+              _id: i._id,
+              nombre: i.nombre,
+              imagen: i.imagen
+            })),
+            cantidad: item.cantidad,
+            subtotal: item.subtotal
+          });
+        }
+      }
+    }
+
     const ventaFormateada = {
-      ...venta._doc,
+      _id: venta._id,
       cliente: venta.cliente_id,
-      productos: venta.productos.map(p => ({
-        ...p._doc,
-        producto: p.producto_id
-      }))
+      fecha_venta: venta.fecha_venta,
+      total: venta.total,
+      estado: venta.estado,
+      productos
     };
 
     res.status(200).json(ventaFormateada);
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("getVentaByIDController:", error);
+    res.status(500).json({ msg: "Error interno", error: error.message });
   }
 };
 
@@ -81,42 +164,73 @@ const updateVentaController = async (req, res) => {
   const { id } = req.params;
   const { estado } = req.body;
 
-  // Validar ID
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(404).json({ msg: "Lo sentimos, la venta no existe" });
   }
 
-  // Validar estado
   if (!["pendiente", "finalizado"].includes(estado)) {
     return res.status(400).json({ msg: "Estado inválido" });
   }
 
   try {
-    // Actualizar venta
     const ventaActualizada = await Ventas.findByIdAndUpdate(
       id,
       { estado },
       { new: true }
-    ).populate("cliente_id", "nombre apellido email")
-      .populate("productos.producto_id", "nombre descripcion imagen precio");
+    ).populate("cliente_id", "nombre apellido email");
 
     if (!ventaActualizada) {
       return res.status(404).json({ msg: "Venta no encontrada" });
     }
 
-    // Convertir todo el documento a objeto plano primero
-    const ventaObj = ventaActualizada.toObject();
+    const productos = [];
 
-    // Formatear productos
-    const productosFormateados = ventaObj.productos.map(p => ({
-      ...p,
-      producto: p.producto_id,
-      producto_id: undefined // opcional: eliminar el campo original
-    }));
+    for (const item of ventaActualizada.productos) {
+      let producto = await Producto.findById(item.producto_id);
+
+      if (producto) {
+        productos.push({
+          producto_id: producto._id,
+          tipo: "normal",
+          nombre: producto.nombre,
+          descripcion: producto.descripcion,
+          imagen: producto.imagen,
+          precio: producto.precio,
+          cantidad: item.cantidad,
+          subtotal: item.subtotal
+        });
+      } else {
+        const personalizado = await ProductoPersonalizado.findById(item.producto_id)
+          .populate("ingredientes", "nombre imagen")
+          .populate("id_categoria", "nombre");
+
+        if (personalizado) {
+          productos.push({
+            producto_id: personalizado._id,
+            tipo: "personalizado",
+            aroma: personalizado.aroma,
+            imagen: personalizado.imagen,
+            precio: personalizado.precio,
+            categoria: personalizado.id_categoria?.nombre || "sin categoría",
+            ingredientes: personalizado.ingredientes?.map(i => ({
+              _id: i._id,
+              nombre: i.nombre,
+              imagen: i.imagen
+            })),
+            cantidad: item.cantidad,
+            subtotal: item.subtotal
+          });
+        }
+      }
+    }
 
     const ventaFormateada = {
-      ...ventaObj,
-      productos: productosFormateados
+      _id: ventaActualizada._id,
+      cliente: ventaActualizada.cliente_id,
+      total: ventaActualizada.total,
+      estado: ventaActualizada.estado,
+      fecha_venta: ventaActualizada.fecha_venta,
+      productos
     };
 
     res.status(200).json({
@@ -125,14 +239,13 @@ const updateVentaController = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("updateVentaController:", error);
     res.status(500).json({
       msg: "Error al actualizar la venta",
       error: error.message
     });
   }
 };
-
 
 // Eliminar una venta
 const deleteVentaController = async (req, res) => {
@@ -154,12 +267,23 @@ const deleteVentaController = async (req, res) => {
       const producto = await Producto.findById(item.producto_id);
 
       if (producto) {
+        // Producto normal
         producto.stock += item.cantidad;
         await producto.save();
+      } else {
+        // Producto personalizado (ya fue eliminado en la venta)
+        const productoPers = await ProductoPersonalizado.findById(item.producto_id).populate("ingredientes");
+
+        if (productoPers) {
+          for (const ingrediente of productoPers.ingredientes) {
+            ingrediente.stock += item.cantidad;
+            await ingrediente.save();
+          }
+        }
       }
     }
 
-    // Eliminar la venta después de ajustar el stock
+    // Eliminar la venta después de ajustar stock
     const ventaEliminada = await Ventas.findByIdAndDelete(id);
 
     res.status(200).json({
@@ -171,6 +295,7 @@ const deleteVentaController = async (req, res) => {
         fecha_venta: ventaEliminada.fecha_venta
       }
     });
+
   } catch (error) {
     console.error("Error al eliminar venta:", error);
     res.status(500).json({ msg: "Error interno del servidor" });
@@ -181,18 +306,72 @@ const getVentasClienteController = async (req, res) => {
   try {
     const clienteId = req.clienteBDD._id;
 
-    const ventasCliente = await Ventas.find({ cliente_id: clienteId })
-      .populate("productos.producto_id", "nombre descripcion precio")
+    const ventasRaw = await Ventas.find({ cliente_id: clienteId })
+      .populate("cliente_id", "nombre apellido email")
       .sort({ fecha_venta: -1 });
 
-    if (!ventasCliente || ventasCliente.length === 0) {
+    if (!ventasRaw || ventasRaw.length === 0) {
       return res.status(404).json({ msg: "No se encontraron ventas asociadas a tu cuenta" });
     }
 
-    res.status(200).json({ ventas: ventasCliente });
+    const ventas = [];
+
+    for (const venta of ventasRaw) {
+      const productos = [];
+
+      for (const item of venta.productos) {
+        let producto = await Producto.findById(item.producto_id);
+
+        if (producto) {
+          productos.push({
+            producto_id: producto._id,
+            tipo: "normal",
+            nombre: producto.nombre,
+            descripcion: producto.descripcion,
+            imagen: producto.imagen,
+            precio: producto.precio,
+            cantidad: item.cantidad,
+            subtotal: item.subtotal
+          });
+        } else {
+          const personalizado = await ProductoPersonalizado.findById(item.producto_id)
+            .populate("ingredientes", "nombre imagen")
+            .populate("id_categoria", "nombre");
+
+          if (personalizado) {
+            productos.push({
+              producto_id: personalizado._id,
+              tipo: "personalizado",
+              aroma: personalizado.aroma,
+              imagen: personalizado.imagen,
+              precio: personalizado.precio,
+              categoria: personalizado.id_categoria?.nombre || "sin categoría",
+              ingredientes: personalizado.ingredientes?.map(i => ({
+                _id: i._id,
+                nombre: i.nombre,
+                imagen: i.imagen
+              })),
+              cantidad: item.cantidad,
+              subtotal: item.subtotal
+            });
+          }
+        }
+      }
+
+      ventas.push({
+        _id: venta._id,
+        fecha_venta: venta.fecha_venta,
+        estado: venta.estado,
+        total: venta.total,
+        productos
+      });
+    }
+
+    res.status(200).json({ ventas });
+
   } catch (error) {
     console.error("Error al obtener ventas del cliente:", error);
-    res.status(500).json({ msg: "Error al obtener tus ventas" });
+    res.status(500).json({ msg: "Error al obtener tus ventas", error: error.message });
   }
 };
 
@@ -202,19 +381,59 @@ const getFacturaClienteById = async (req, res) => {
 
   try {
     const venta = await Ventas.findById(id)
-      .populate("cliente_id", "nombre apellido email")
-      .populate("productos.producto_id", "nombre descripcion imagen precio");
+      .populate("cliente_id", "nombre apellido email");
 
     if (!venta) {
       return res.status(404).json({ msg: "Venta no encontrada" });
     }
 
-    // Asegurarse que el cliente solo vea su propia venta
     if (venta.cliente_id._id.toString() !== clienteId.toString()) {
       return res.status(403).json({ msg: "No tienes permiso para ver esta venta" });
     }
 
-    // Formato tipo factura
+    const productos = [];
+
+    for (const item of venta.productos) {
+      let producto = null;
+
+      // Intentar cargar como producto normal
+      producto = await Producto.findById(item.producto_id);
+
+      if (producto) {
+        productos.push({
+          producto_id: producto._id,
+          nombre: producto.nombre,
+          imagen: producto.imagen,
+          precio: producto.precio,
+          cantidad: item.cantidad,
+          subtotal: item.subtotal
+        });
+      } else {
+        // Si no está en productos normales, buscar en personalizados
+        const productoPers = await ProductoPersonalizado.findById(item.producto_id)
+          .populate("ingredientes", "nombre imagen")
+          .populate("id_categoria", "nombre");
+
+        if (productoPers) {
+          productos.push({
+            producto_id: productoPers._id,
+            tipo: "personalizado",
+            aroma: productoPers.aroma,
+            imagen: productoPers.imagen,
+            precio: productoPers.precio,
+            categoria: productoPers.id_categoria?.nombre || "sin categoría",
+            ingredientes: productoPers.ingredientes?.map(i => ({
+              _id: i._id,
+              nombre: i.nombre,
+              imagen: i.imagen
+            })),
+            cantidad: item.cantidad,
+            subtotal: item.subtotal
+          });
+        }
+      }
+    }
+
     const factura = {
       fecha: venta.fecha_venta,
       cliente: {
@@ -222,14 +441,7 @@ const getFacturaClienteById = async (req, res) => {
         apellido: venta.cliente_id.apellido,
         email: venta.cliente_id.email
       },
-      productos: venta.productos.map(p => ({
-        producto_id: p.producto_id,
-        nombre: p.producto_id.nombre,
-        imagen: p.producto_id.imagen,
-        precio: p.producto_id.precio,
-        cantidad: p.cantidad,
-        subtotal: p.subtotal
-      })),
+      productos,
       total: venta.total,
       estado: venta.estado
     };
@@ -267,40 +479,45 @@ const getDashboardController = async (req, res) => {
     // 1. Total de clientes
     const numeroClientes = await Clientes.countDocuments();
 
-    // 2. Ventas finalizadas entre fechas, con categoría de producto poblada
+    // 2. Obtener ventas finalizadas en ese rango
     const ventas = await Ventas.find({
       fecha_venta: { $gte: inicio, $lte: fin },
       estado: "finalizado"
-    }).populate({
-      path: "productos.producto_id",
-      populate: { path: "id_categoria" }
     });
 
-    // Inicializar mapa por día y contadores de categorías
+    // Inicializar estructuras de acumulación
     const ventasPorDia = {};
     let vendidos = { jabones: 0, velas: 0 };
 
     for (const venta of ventas) {
-      // Formato de fecha: "dd/mm/yyyy"
+      // Total por día
       const fecha = venta.fecha_venta.toLocaleDateString("es-EC", {
         day: "2-digit",
         month: "2-digit",
         year: "numeric"
       });
 
-      // Acumular total por día
       ventasPorDia[fecha] = (ventasPorDia[fecha] || 0) + venta.total;
 
-      // Contar productos por categoría
       for (const p of venta.productos) {
-        const categoriaNombre = p.producto_id?.id_categoria?.nombre?.toLowerCase().trim();
+        let categoria = null;
 
-        if (categoriaNombre?.includes("jabon")) vendidos.jabones += p.cantidad;
-        if (categoriaNombre?.includes("vela")) vendidos.velas += p.cantidad;
+        const producto = await Producto.findById(p.producto_id).populate("id_categoria", "nombre");
+        if (producto) {
+          categoria = producto.id_categoria?.nombre?.toLowerCase();
+        } else {
+          const personalizado = await ProductoPersonalizado.findById(p.producto_id).populate("id_categoria", "nombre");
+          if (personalizado) {
+            categoria = personalizado.id_categoria?.nombre?.toLowerCase();
+          }
+        }
+
+        if (categoria?.includes("jabon")) vendidos.jabones += p.cantidad;
+        if (categoria?.includes("vela")) vendidos.velas += p.cantidad;
       }
     }
 
-    // Generar lista de fechas completas en el rango y rellenar con 0 si no hubo ventas
+    // Fechas completas para el gráfico
     const ventasDiarias = [];
     for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) {
       const fecha = d.toLocaleDateString("es-EC", {

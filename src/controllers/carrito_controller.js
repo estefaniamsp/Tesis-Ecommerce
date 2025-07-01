@@ -281,7 +281,6 @@ const pagarCarritoController = async (req, res) => {
     let carrito;
 
     try {
-
         carrito = await Carrito.findOneAndUpdate(
             { cliente_id: clienteId, estado: "pendiente" },
             { estado: "procesando" },
@@ -360,14 +359,61 @@ const pagarCarritoController = async (req, res) => {
         });
 
         await nuevaVenta.save();
-        await nuevaVenta.populate("productos.producto_id", "nombre descripcion imagen precio");
+
+        // Armar manualmente productos en venta
+        const productosEnVenta = [];
+
+        for (const item of productosConDetalles) {
+            let producto = null;
+
+            if (item.producto.tipo_producto === "personalizado" || item.producto.tipo_producto === "ia") {
+                const ingredientes = item.producto.ingredientes?.map(ing => ({
+                    _id: ing._id,
+                    nombre: ing.nombre,
+                    imagen: ing.imagen,
+                })) || [];
+
+                producto = {
+                    _id: item.producto._id,
+                    tipo: item.producto.tipo_producto,
+                    aroma: item.producto.aroma,
+                    imagen: item.producto.imagen || null,
+                    precio: item.producto.precio,
+                    ingredientes,
+                };
+            } else {
+                producto = {
+                    _id: item.producto._id,
+                    nombre: item.producto.nombre,
+                    descripcion: item.producto.descripcion,
+                    imagen: item.producto.imagen,
+                    precio: item.producto.precio,
+                };
+            }
+
+            productosEnVenta.push({
+                cantidad: item.cantidad,
+                subtotal: item.subtotal,
+                producto,
+            });
+        }
 
         carrito.productos = [];
         carrito.total = 0;
         carrito.estado = "pendiente";
         await carrito.save();
 
-        return res.status(200).json({ msg: "Pago exitoso.", venta: nuevaVenta, cliente });
+        return res.status(200).json({
+            msg: "Pago exitoso.",
+            venta: {
+                _id: nuevaVenta._id,
+                cliente_id: nuevaVenta.cliente_id,
+                total: nuevaVenta.total,
+                estado: nuevaVenta.estado,
+                productos: productosEnVenta,
+            },
+            cliente,
+        });
 
     } catch (error) {
         console.error("Error al pagar el carrito:", error);
