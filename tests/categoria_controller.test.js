@@ -27,7 +27,7 @@ afterEach(() => {
     jest.clearAllMocks();
 });
 
-/*describe("getAllCategoriasController", () => {
+describe("getAllCategoriasController", () => {
     test("retorna categorías", async () => {
         Categoria.find.mockResolvedValue([{ nombre: "Jabones" }]);
 
@@ -36,7 +36,7 @@ afterEach(() => {
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith({ categorias: [{ nombre: "Jabones" }] });
     });
-});*/
+});
 
 describe("getCategoriaByIDController", () => {
     test("ID válido y categoría encontrada", async () => {
@@ -50,7 +50,7 @@ describe("getCategoriaByIDController", () => {
     });
 });
 
-/*describe("createCategoriaController", () => {
+describe("createCategoriaController", () => {
     test("crea categoría exitosamente", async () => {
         req.body = { nombre: "Velas", descripcion: "Decorativas" };
         req.file = { path: "fake-url", filename: "img123" };
@@ -87,9 +87,9 @@ describe("updateCategoriaController", () => {
             expect.objectContaining({ msg: "Categoría actualizada exitosamente" })
         );
     });
-});*/
+});
 
-/*describe("deleteCategoriaController", () => {
+describe("deleteCategoriaController", () => {
     test("elimina categoría y su imagen", async () => {
         req.params.id = new mongoose.Types.ObjectId().toString();
         Categoria.findById.mockResolvedValue({ imagen_id: "img123" });
@@ -101,4 +101,4 @@ describe("updateCategoriaController", () => {
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith({ msg: "Categoría eliminada exitosamente" });
     });
-});*/
+});

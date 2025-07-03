@@ -37,7 +37,17 @@ const productoPersonalizadoSchema = new Schema(
             required: true,
             maxLength: 100,
             trim: true,
-        }
+        },
+        estado: {
+            type: String,
+            enum: ["activo", "en_carrito", "comprado", "eliminado"],
+            default: "activo"
+        },
+        tipo_producto: {
+            type: String,
+            enum: ["personalizado", "ia"],
+            default: "personalizado",
+        },
     },
     {
         timestamps: true,

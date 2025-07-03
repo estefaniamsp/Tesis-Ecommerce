@@ -53,7 +53,7 @@ afterEach(() => {
     jest.clearAllMocks();
 });
 
-/*describe("getCarritoClienteController", () => {
+describe("getCarritoClienteController", () => {
     test("carrito encontrado", async () => {
         Carrito.findOne.mockReturnValue({
             populate: jest.fn().mockResolvedValue({ _id: "carritoId", productos: [] })
@@ -76,10 +76,10 @@ afterEach(() => {
         expect(res.status).toHaveBeenCalledWith(404);
         expect(res.json).toHaveBeenCalledWith({ msg: "No tienes un carrito asociado aún" });
     });
-});*/
+});
 
 
-/*describe("addCarritoController", () => {
+describe("addCarritoController", () => {
     test("agrega producto correctamente", async () => {
         req.body = { producto_id: new mongoose.Types.ObjectId().toString(), cantidad: 2 };
 
@@ -109,9 +109,9 @@ afterEach(() => {
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ msg: "Producto agregado al carrito" }));
     });
-});*/
+});
 
-/*describe("updateCantidadProductoController", () => {
+describe("updateCantidadProductoController", () => {
     test("aumenta y recalcula subtotal", async () => {
         const prodId = new mongoose.Types.ObjectId().toString();
         req.body = { producto_id: prodId, cantidad: 1 };
@@ -145,7 +145,7 @@ describe("removeProductoCarritoController", () => {
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ msg: "Producto eliminado del carrito" }));
     });
-});*/
+});
 
 describe("emptyCarritoController", () => {
     test("vacía carrito", async () => {
@@ -157,10 +157,10 @@ describe("emptyCarritoController", () => {
     });
 });
 
-/*describe("pagarCarritoController", () => {
+describe("pagarCarritoController", () => {
     test("paymentMethodId faltante", async () => {
         req.body = { paymentMethodId: "" };
         await pagarCarritoController(req, res);
         expect(res.status).toHaveBeenCalledWith(400);
     });
-});*/
+});

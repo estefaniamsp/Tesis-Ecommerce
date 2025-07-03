@@ -41,7 +41,7 @@ const clearMocks = () => {
     jest.clearAllMocks();
 };
 
-/*describe("getAllProductosController", () => {
+describe("getAllProductosController", () => {
     afterEach(clearMocks);
 
     const chainableFind = (dataOrPromise) => ({
@@ -88,9 +88,9 @@ const clearMocks = () => {
 
         expect(res.status).toHaveBeenCalledWith(500);
     });
-});*/
+});
 
-/*describe("getProductoByIDController", () => {
+describe("getProductoByIDController", () => {
   afterEach(clearMocks);
 
   it("devuelve producto (200) y registra vista", async () => {
@@ -126,9 +126,9 @@ const clearMocks = () => {
     await getProductoByIDController(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
   });
-});*/
+});
 
-/*describe("createProductoController", () => {
+describe("createProductoController", () => {
   afterEach(clearMocks);
 
   const baseReq = {
@@ -175,10 +175,10 @@ const clearMocks = () => {
     expect(cloudinary.uploader.destroy).toHaveBeenCalledWith("img");
     expect(res.status).toHaveBeenCalledWith(400);
   });
-});*/
+});
 
 
-/*describe("updateProductoController", () => {
+describe("updateProductoController", () => {
   afterEach(clearMocks);
 
   it("200 al actualizar", async () => {
@@ -201,9 +201,9 @@ const clearMocks = () => {
     await updateProductoController(req, res);
     expect(res.status).toHaveBeenCalledWith(404);
   });
-});*/
+});
 
-/*describe("deleteProductoController", () => {
+describe("deleteProductoController", () => {
   afterEach(clearMocks);
 
   it("200 y desactiva", async () => {
@@ -225,7 +225,7 @@ const clearMocks = () => {
     await deleteProductoController(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
   });
-});*/
+});
 
 describe("reactivarProductoController", () => {
   afterEach(clearMocks);
@@ -251,7 +251,7 @@ describe("reactivarProductoController", () => {
   });
 });
 
-/*describe("personalizarProductoIAController", () => {
+describe("personalizarProductoIAController", () => {
   afterEach(clearMocks);
 
   it("403 si no hay cliente", async () => {
@@ -282,4 +282,4 @@ describe("reactivarProductoController", () => {
     expect(res.status).toHaveBeenCalledWith(201);
     expect(ProductoPersonalizado.prototype.save).toHaveBeenCalled();
   });
-});*/
+});

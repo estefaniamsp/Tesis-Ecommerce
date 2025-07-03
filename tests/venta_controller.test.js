@@ -31,7 +31,7 @@ afterEach(() => {
     jest.clearAllMocks();
 });
 
-/*describe("getAllVentasController", () => {
+describe("getAllVentasController", () => {
     test("debería retornar ventas paginadas", async () => {
         Ventas.find.mockReturnValue({
             populate: jest.fn().mockReturnValue({
@@ -49,9 +49,9 @@ afterEach(() => {
             expect.objectContaining({ totalVentas: 1 })
         );
     });
-});*/
+});
 
-/*describe("getVentaByIDController", () => {
+describe("getVentaByIDController", () => {
     test("debería retornar una venta por id", async () => {
         req.params.id = "venta-id";
         Ventas.findById.mockReturnValue({ populate: jest.fn().mockResolvedValue({ total: 100 }) });
@@ -88,9 +88,9 @@ describe("deleteVentaController", () => {
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith({ msg: expect.stringContaining("eliminada exitosamente") });
     });
-});*/
+});
 
-/*describe("getVentasClienteController", () => {
+describe("getVentasClienteController", () => {
     test("debería obtener ventas del cliente", async () => {
         req.clienteBDD._id = "cliente-id";
         Ventas.find.mockReturnValue({ populate: jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue([{}]) }) });
@@ -100,7 +100,7 @@ describe("deleteVentaController", () => {
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith({ ventas: [{}] });
     });
-});*/
+});
 
 describe("getFacturaClienteById", () => {
     afterEach(() => jest.clearAllMocks());
@@ -173,7 +173,7 @@ describe("getFacturaClienteById", () => {
     });
 });
 
-/*describe("getDashboardController", () => {
+describe("getDashboardController", () => {
     test("debería retornar métricas del dashboard", async () => {
         req.query = { fechaInicio: "2024-01-01", fechaFin: "2024-01-31" };
         Clientes.countDocuments.mockResolvedValue(3);
@@ -184,4 +184,4 @@ describe("getFacturaClienteById", () => {
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ numeroClientes: 3 }));
     });
-});*/
+});

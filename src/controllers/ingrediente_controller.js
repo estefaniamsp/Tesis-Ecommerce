@@ -76,8 +76,8 @@ const createIngredienteController = async (req, res) => {
         return res.status(400).json({ msg: "El stock debe ser un número entero entre 0 y 100 unidades." });
     }
 
-    if (isNaN(precio) || precio < 1 || precio > 1000) {
-        return res.status(400).json({ msg: "El precio debe estar entre $1 y $1000." });
+    if (isNaN(precio) || precio < 0.50 || precio > 20) {
+        return res.status(400).json({ msg: "El precio debe estar entre $0.50 y $20." });
     }
 
     try {

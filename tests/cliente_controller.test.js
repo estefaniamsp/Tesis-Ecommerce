@@ -28,7 +28,7 @@ jest.mock("../src/models/carritos.js");
 jest.mock("bcrypt");
 jest.mock("../src/config/nodemailer.js");
 
-/*test("Debería registrar un cliente exitosamente", async () => {
+test("Debería registrar un cliente exitosamente", async () => {
     const saveMock = jest.fn().mockResolvedValue(true);
     const crearTokenMock = jest.fn().mockReturnValue("token-cliente");
 
@@ -78,9 +78,9 @@ jest.mock("../src/config/nodemailer.js");
             email: "juan123@yopmail.com",
         }
     });
-});*/
+});
 
-/*describe("Pruebas Unitarias - Cliente - Login", () => {
+describe("Pruebas Unitarias - Cliente - Login", () => {
     let req, res;
 
     beforeEach(() => {
@@ -133,9 +133,9 @@ jest.mock("../src/config/nodemailer.js");
             _id: "cliente-id"
         });
     });
-});*/
+});
 
-/*test("Debería actualizar el perfil del cliente", async () => {
+test("Debería actualizar el perfil del cliente", async () => {
     const saveMock = jest.fn();
     Clientes.findById.mockResolvedValue({
         _id: "cliente-id",
@@ -179,7 +179,7 @@ jest.mock("../src/config/nodemailer.js");
             telefono: "0912345678"
         })
     });
-});*/
+});
 
 test("Debería devolver el perfil del cliente si existe", async () => {
     Clientes.findById.mockResolvedValue({
@@ -222,7 +222,7 @@ nodemailer.createTransport.mockReturnValue({
     sendMail: sendMailMock
 });
 
-/*test("Debería enviar código de recuperación si el cliente existe", async () => {
+test("Debería enviar código de recuperación si el cliente existe", async () => {
     const saveMock = jest.fn();
     Clientes.findOne.mockResolvedValue({
         email: "cliente@correo.com",
@@ -308,9 +308,9 @@ test("Debería confirmar el correo del cliente si el token es válido", async ()
     expect(clienteMock.token).toBe(null);
     expect(saveMock).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
-});*/
+});
 
-/*test("Debería obtener todos los clientes con paginación", async () => {
+test("Debería obtener todos los clientes con paginación", async () => {
     Clientes.find.mockReturnValue({
         select: jest.fn().mockReturnValue({
             skip: jest.fn().mockReturnValue({
@@ -342,9 +342,9 @@ test("Debería confirmar el correo del cliente si el token es válido", async ()
             { nombre: "Cliente 2" }
         ]
     });
-});*/
+});
 
-/*test("Debería obtener un cliente por ID si es válido", async () => {
+test("Debería obtener un cliente por ID si es válido", async () => {
     const clienteMock = { nombre: "Juan", email: "juan@correo.com" };
 
     Clientes.findById.mockResolvedValue(clienteMock);
@@ -417,4 +417,4 @@ test("Debería activar un cliente si está inactivo", async () => {
     expect(res.json).toHaveBeenCalledWith({
         msg: "Estado del cliente 'Andrea López' actualizado a inactivo exitosamente"
     });
-});*/
+});

@@ -92,7 +92,13 @@ const clienteSchema = new Schema(
     toJSON: {
       transform(doc, ret) {
         delete ret.__v;
-        delete ret.imagen_id; 
+        delete ret.imagen_id;
+        delete ret.password;
+        delete ret.token;
+        delete ret.codigoRecuperacion;
+        delete ret.codigoRecuperacionExpires;
+        delete ret.confirmEmail;
+        delete ret.estado;
       },
     },
   }

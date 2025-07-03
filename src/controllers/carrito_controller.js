@@ -31,7 +31,10 @@ const getCarritoClienteController = async (req, res) => {
 
         const [productosNormales, productosPersonalizados] = await Promise.all([
             Producto.find({ _id: { $in: idsNormales } }),
-            ProductoPersonalizado.find({ _id: { $in: idsPersonalizados } }).populate("ingredientes"),
+            ProductoPersonalizado.find({
+                _id: { $in: idsPersonalizados },
+                estado: "en_carrito"
+            }).populate("ingredientes")
         ]);
 
         const productosEnriquecidos = carrito.productos.map(item => {
@@ -79,6 +82,11 @@ const addCarritoController = async (req, res) => {
         let producto;
         if (tipo_producto === "personalizado" || tipo_producto === "ia") {
             producto = await ProductoPersonalizado.findById(producto_id.trim());
+
+            if (producto.estado !== "en_carrito") {
+                producto.estado = "en_carrito";
+                await producto.save();
+            }
         } else {
             producto = await Producto.findById(producto_id.trim());
         }
@@ -238,6 +246,14 @@ const removeProductoCarritoController = async (req, res) => {
         }
 
         carrito.total = parseFloat(carrito.productos.reduce((acc, p) => acc + p.subtotal, 0).toFixed(2));
+
+        if (tipo_producto === "personalizado" || tipo_producto === "ia") {
+            const producto = await ProductoPersonalizado.findById(producto_id);
+            if (producto && producto.estado === "en_carrito") {
+                producto.estado = "eliminado"; 
+                await producto.save();
+            }
+        }
         await carrito.save();
 
         return res.status(200).json({ msg: "Producto eliminado del carrito", carrito });
@@ -257,6 +273,15 @@ const emptyCarritoController = async (req, res) => {
         });
 
         if (!carrito) return res.status(404).json({ msg: "Carrito no encontrado." });
+
+        // 👉 Actualizar estado de productos personalizados
+        for (const item of carrito.productos) {
+            if (item.tipo_producto === "personalizado" || item.tipo_producto === "ia") {
+                await ProductoPersonalizado.findByIdAndUpdate(item.producto_id, {
+                    estado: "eliminado"
+                });
+            }
+        }
 
         carrito.productos = [];
         carrito.total = 0;
@@ -330,7 +355,8 @@ const pagarCarritoController = async (req, res) => {
                     await ingrediente.save();
                 }
 
-                await ProductoPersonalizado.deleteOne({ _id: producto._id });
+                producto.estado = "comprado";
+                await producto.save();
 
             } else {
                 producto = await Producto.findById(item.producto_id);

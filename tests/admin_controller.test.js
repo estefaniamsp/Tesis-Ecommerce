@@ -16,7 +16,7 @@ jest.mock("nodemailer");
 jest.mock("jsonwebtoken");
 jest.mock("bcrypt");
 
-/*describe("Pruebas Unitarias - Admin - Login", () => {
+describe("Pruebas Unitarias - Admin - Login", () => {
     let req, res;
 
     beforeEach(() => {
@@ -59,9 +59,9 @@ jest.mock("bcrypt");
             token: "token-mock",
         });
     });
-});*/
+});
 
-/*describe("Pruebas Unitarias - Admin - Confirmación de Email", () => {
+describe("Pruebas Unitarias - Admin - Confirmación de Email", () => {
     let req, res;
 
     beforeEach(() => {
@@ -93,9 +93,9 @@ jest.mock("bcrypt");
         expect(adminMock.save).toHaveBeenCalled();
         expect(res.status).toHaveBeenCalledWith(200);
     });
-});*/
+});
 
-/*describe("Pruebas Unitarias - Admin - Recuperar Contraseña", () => {
+describe("Pruebas Unitarias - Admin - Recuperar Contraseña", () => {
     let req, res;
     let mockTransport;
 
@@ -153,7 +153,7 @@ jest.mock("bcrypt");
         expect(res.status).toHaveBeenCalledWith(404);
         expect(res.json).toHaveBeenCalledWith({ msg: "Administrador no encontrado" });
     });
-});*/
+});
 
 describe("Pruebas Unitarias - Admin - Cambiar Contraseña", () => {
     let req, res;

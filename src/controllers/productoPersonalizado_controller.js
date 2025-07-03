@@ -1,5 +1,6 @@
 import ProductoPersonalizado from "../models/productosPersonalizados.js";
 import Ingrediente from "../models/ingredientes.js";
+import Carrito from "../models/carritos.js";
 import mongoose from "mongoose";
 import cloudinary from "../config/cloudinary.js";
 import { recomendarProductoConHF } from "../services/huggingFaceIA.js";
@@ -19,13 +20,19 @@ const getAllProductosPersonalizadosController = async (req, res) => {
         if (limit < 1) limit = 10;
         const skip = (page - 1) * limit;
 
-        const productos = await ProductoPersonalizado.find({ cliente_id: clienteId })
+        const productos = await ProductoPersonalizado.find({
+            cliente_id: clienteId,
+            estado: "en_carrito"
+        })
             .populate("ingredientes")
             .skip(skip)
             .limit(limit)
             .sort({ createdAt: -1 });
 
-        const totalProductos = await ProductoPersonalizado.countDocuments({ cliente_id: clienteId });
+        const totalProductos = await ProductoPersonalizado.countDocuments({
+            cliente_id: clienteId,
+            estado: "en_carrito"
+        });
         const totalPaginas = Math.ceil(totalProductos / limit);
 
         if (productos.length === 0) {
@@ -171,6 +178,10 @@ const createProductoPersonalizadoController = async (req, res) => {
             id_categoria,
             precio,
             aroma: aroma.nombre,
+            tipo_producto: ["personalizado", "ia"].includes(req.body.tipo_producto)
+                ? req.body.tipo_producto
+                : "personalizado",
+            estado: "activo",
         });
 
         await nuevoProducto.save();
@@ -321,6 +332,10 @@ const updateImagenProductoPersonalizadoController = async (req, res) => {
         return res.status(400).json({ msg: "La imagen es obligatoria" });
     }
 
+    if (req.body.tipo_producto && req.body.tipo_producto !== producto.tipo_producto) {
+        return res.status(400).json({ msg: "No puedes cambiar el tipo del producto (personalizado o ia)." });
+    }
+
     try {
         const producto = await ProductoPersonalizado.findById(id);
 
@@ -434,6 +449,7 @@ const personalizarProductoIAController = async (req, res) => {
             msg: "Producto recomendado por IA generado exitosamente.",
             producto_personalizado: {
                 ...productoIA,
+                tipo_producto: "ia",
                 origen: "ia"
             }
         });
