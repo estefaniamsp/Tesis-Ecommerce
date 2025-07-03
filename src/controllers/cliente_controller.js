@@ -29,12 +29,12 @@ const registerCliente = async (req, res) => {
 
   const verificarEmailBDD = await Clientes.findOne({ email });
   if (verificarEmailBDD) {
-    return res.status(400).json({ msg: "Este correo ya está registrado por otro cliente" });
+    return res.status(400).json({ msg: "Este correo ya está registrado" });
   }
 
   const verificarEmailBDDAdmin = await Admin.findOne({ email });
   if (verificarEmailBDDAdmin) {
-    return res.status(400).json({ msg: "Este correo pertenece a un administrador y no puede usarse para registrar un cliente" });
+    return res.status(400).json({ msg: "Este correo ya está registrado" });
   }
 
   try {

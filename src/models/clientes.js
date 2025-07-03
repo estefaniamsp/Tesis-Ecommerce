@@ -98,7 +98,6 @@ const clienteSchema = new Schema(
         delete ret.codigoRecuperacion;
         delete ret.codigoRecuperacionExpires;
         delete ret.confirmEmail;
-        delete ret.estado;
       },
     },
   }

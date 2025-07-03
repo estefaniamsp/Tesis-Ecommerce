@@ -22,7 +22,7 @@ const getAllProductosPersonalizadosController = async (req, res) => {
 
         const productos = await ProductoPersonalizado.find({
             cliente_id: clienteId,
-            estado: "en_carrito"
+            estado: { $in: ["en_carrito", "activo", "comprado"] }
         })
             .populate("ingredientes")
             .skip(skip)
@@ -31,7 +31,7 @@ const getAllProductosPersonalizadosController = async (req, res) => {
 
         const totalProductos = await ProductoPersonalizado.countDocuments({
             cliente_id: clienteId,
-            estado: "en_carrito"
+            estado: { $in: ["en_carrito", "activo", "comprado"] }
         });
         const totalPaginas = Math.ceil(totalProductos / limit);
 
