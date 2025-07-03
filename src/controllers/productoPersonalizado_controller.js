@@ -344,10 +344,6 @@ const updateImagenProductoPersonalizadoController = async (req, res) => {
         return res.status(400).json({ msg: "La imagen es obligatoria" });
     }
 
-    if (req.body.tipo_producto && req.body.tipo_producto !== producto.tipo_producto) {
-        return res.status(400).json({ msg: "No puedes cambiar el tipo del producto (personalizado o ia)." });
-    }
-
     try {
         const producto = await ProductoPersonalizado.findById(id);
 
@@ -359,6 +355,15 @@ const updateImagenProductoPersonalizadoController = async (req, res) => {
         if (producto.cliente_id.toString() !== req.clienteBDD._id.toString()) {
             await cloudinary.uploader.destroy(req.file.filename);
             return res.status(403).json({ msg: "No tienes permiso para modificar este producto." });
+        }
+
+        // ✅ Si se envía tipo_producto y es diferente, avisar que no se puede modificar aquí
+        if (
+            req.body.tipo_producto &&
+            req.body.tipo_producto !== producto.tipo_producto
+        ) {
+            await cloudinary.uploader.destroy(req.file.filename);
+            return res.status(400).json({ msg: "No puedes cambiar el tipo del producto (personalizado o ia) desde este endpoint." });
         }
 
         // Eliminar imagen anterior si existe
@@ -373,10 +378,11 @@ const updateImagenProductoPersonalizadoController = async (req, res) => {
         // Asignar nueva imagen
         producto.imagen = req.file.path;
         producto.imagen_id = req.file.filename;
+
         await producto.save();
 
         return res.status(200).json({
-            msg: "Imagen del producto personalizada actualizada",
+            msg: "Imagen del producto personalizado actualizada correctamente",
             imagen: producto.imagen
         });
 

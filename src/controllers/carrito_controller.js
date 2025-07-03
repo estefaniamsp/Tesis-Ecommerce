@@ -285,7 +285,7 @@ const emptyCarritoController = async (req, res) => {
         for (const item of carrito.productos) {
             if (item.tipo_producto === "personalizado" || item.tipo_producto === "ia") {
                 await ProductoPersonalizado.findByIdAndUpdate(item.producto_id, {
-                    estado: "eliminado"
+                    estado: "guardado"
                 });
             }
         }

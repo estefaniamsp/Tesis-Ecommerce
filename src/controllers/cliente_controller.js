@@ -268,7 +268,7 @@ const updateClienteProfile = async (req, res) => {
       if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
         edad--;
       }
-      if (edad <= 18) {
+      if (edad < 18) {
         return res.status(400).json({ msg: "Debes tener al menos 18 años para registrarte" });
       }
     }
@@ -594,7 +594,7 @@ const activeClienteAdmin = async (req, res) => {
 
     await Clientes.findByIdAndUpdate(id, { estado: 'activo' });
 
-    res.status(200).json({ msg: `Estado del cliente '${cliente.nombre} ${cliente.apellido}' actualizado a inactivo exitosamente` });
+    res.status(200).json({ msg: `Estado del cliente '${cliente.nombre} ${cliente.apellido}' actualizado a activo exitosamente` });
   } catch (error) {
     console.error("Error en activeClienteAdmin:", error);
     res.status(500).json({ error: "Error al actualizar el estado del cliente", detalle: error.message });
