@@ -15,7 +15,7 @@ const registerCliente = async (req, res) => {
   nombre = nombre?.trim();
   apellido = apellido?.trim();
   genero = genero?.trim();
-  email = email?.trim();
+  email = email?.trim().toLowerCase();
   password = password?.trim();
 
   if (!nombre || !apellido || !genero || !email || !password) {
@@ -29,16 +29,15 @@ const registerCliente = async (req, res) => {
 
   const verificarEmailBDD = await Clientes.findOne({ email });
   if (verificarEmailBDD) {
-    return res.status(400).json({ msg: "El email ya se encuentra registrado" });
+    return res.status(400).json({ msg: "Este correo ya está registrado por otro cliente" });
   }
 
   const verificarEmailBDDAdmin = await Admin.findOne({ email });
   if (verificarEmailBDDAdmin) {
-    return res.status(400).json({ msg: "El email ya se encuentra registrado" });
+    return res.status(400).json({ msg: "Este correo pertenece a un administrador y no puede usarse para registrar un cliente" });
   }
 
   try {
-    // 1. Crear cliente sin token
     const nuevoCliente = new Clientes({
       nombre,
       apellido,
@@ -47,25 +46,20 @@ const registerCliente = async (req, res) => {
       password: await bcrypt.hash(password, 10)
     });
 
-    // Guardar el cliente
     await nuevoCliente.save();
 
-    // Crear un carrito vacío al registrar el cliente
     const nuevoCarrito = new Carrito({
       cliente_id: nuevoCliente._id,
       productos: [],
       total: 0,
       estado: "pendiente",
     });
-
     await nuevoCarrito.save();
 
-    // Generar y asignar token
     const token = nuevoCliente.crearToken();
     nuevoCliente.token = token;
-    await nuevoCliente.save(); // Guardar con token
+    await nuevoCliente.save();
 
-    // Enviar correo
     try {
       await sendMailToUser(email, token);
     } catch (mailError) {
@@ -73,7 +67,6 @@ const registerCliente = async (req, res) => {
       return res.status(500).json({ msg: "Cliente creado, pero falló el envío del correo de confirmación" });
     }
 
-    // Respuesta sin campos sensibles
     const {
       password: _,
       token: __,
@@ -216,12 +209,12 @@ const updateClienteProfile = async (req, res) => {
     const clienteId = req.clienteBDD._id.toString();
     const body = req.body;
 
+    // Ignoramos cualquier intento de modificar el email
     const campos = {
       cedula: body.cedula?.trim(),
       nombre: body.nombre?.trim(),
       apellido: body.apellido?.trim(),
       genero: body.genero?.trim(),
-      email: body.email?.trim(),
       direccion: body.direccion?.trim(),
       telefono: body.telefono?.trim(),
       fecha_nacimiento: body.fecha_nacimiento?.trim()
@@ -256,10 +249,6 @@ const updateClienteProfile = async (req, res) => {
     if (esValorValido(campos.genero) && !["masculino", "femenino"].includes(campos.genero)) {
       return res.status(400).json({ msg: "El género debe ser 'masculino' o 'femenino'" });
     }
-    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (esValorValido(campos.email) && !regexEmail.test(campos.email)) {
-      return res.status(400).json({ msg: "El correo ingresado no es válido" });
-    }
     if (esValorValido(campos.telefono) && !/^\d{10}$/.test(campos.telefono)) {
       return res.status(400).json({ msg: "El teléfono debe tener exactamente 10 números" });
     }
@@ -270,7 +259,7 @@ const updateClienteProfile = async (req, res) => {
       return res.status(400).json({ msg: "La fecha de nacimiento debe tener el formato YYYY-MM-DD" });
     }
 
-    // Verificar duplicados
+    // Verificar duplicados excepto email
     for (const [campo, valor] of camposValidos) {
       if (valor !== cliente[campo]) {
         const existe = await Clientes.findOne({ [campo]: valor });
@@ -307,7 +296,7 @@ const updateClienteProfile = async (req, res) => {
         nombre: cliente.nombre,
         apellido: cliente.apellido,
         genero: cliente.genero,
-        email: cliente.email,
+        email: cliente.email, // Se mantiene el original
         direccion: cliente.direccion,
         telefono: cliente.telefono,
         fecha_nacimiento: cliente.fecha_nacimiento,
