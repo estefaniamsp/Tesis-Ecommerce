@@ -250,7 +250,7 @@ const removeProductoCarritoController = async (req, res) => {
         if (tipo_producto === "personalizado" || tipo_producto === "ia") {
             const producto = await ProductoPersonalizado.findById(producto_id);
             if (producto && producto.estado === "en_carrito") {
-                producto.estado = "eliminado"; 
+                producto.estado = "eliminado";
                 await producto.save();
             }
         }
@@ -306,18 +306,24 @@ const pagarCarritoController = async (req, res) => {
     let carrito;
 
     try {
-        carrito = await Carrito.findOneAndUpdate(
-            { cliente_id: clienteId, estado: "pendiente" },
-            { estado: "procesando" },
-            { new: true }
-        );
+        // 1. Buscar carrito sin actualizar aún
+        carrito = await Carrito.findOne({ cliente_id: clienteId, estado: "pendiente" });
 
         if (!carrito || carrito.productos.length === 0 || carrito.total <= 0) {
             return res.status(400).json({ msg: "No se puede procesar el carrito." });
         }
 
+        // 2. Validar existencia de cliente
         const cliente = await Clientes.findById(clienteId);
+        if (!cliente) {
+            return res.status(404).json({ msg: "Cliente no encontrado." });
+        }
 
+        // 3. Cambiar estado a "procesando"
+        carrito.estado = "procesando";
+        await carrito.save();
+
+        // 4. Verificar o crear cliente en Stripe
         let [stripeCliente] = (await stripe.customers.list({ email: cliente.email, limit: 1 })).data || [];
         if (!stripeCliente) {
             stripeCliente = await stripe.customers.create({
@@ -326,6 +332,7 @@ const pagarCarritoController = async (req, res) => {
             });
         }
 
+        // 5. Crear intento de pago
         const payment = await stripe.paymentIntents.create({
             amount: Math.round(carrito.total * 100),
             currency: "USD",
@@ -338,6 +345,7 @@ const pagarCarritoController = async (req, res) => {
 
         if (payment.status !== "succeeded") throw new Error("El pago no fue exitoso");
 
+        // 6. Procesar productos del carrito
         const productosConDetalles = [];
 
         for (const item of carrito.productos) {
@@ -346,9 +354,7 @@ const pagarCarritoController = async (req, res) => {
             if (item.tipo_producto === "personalizado" || item.tipo_producto === "ia") {
                 producto = await ProductoPersonalizado.findById(item.producto_id).populate("ingredientes");
 
-                if (!producto) {
-                    throw new Error("Producto personalizado no encontrado");
-                }
+                if (!producto) throw new Error("Producto personalizado no encontrado");
 
                 for (const ingrediente of producto.ingredientes) {
                     ingrediente.stock = Math.max(0, ingrediente.stock - item.cantidad);
@@ -357,7 +363,6 @@ const pagarCarritoController = async (req, res) => {
 
                 producto.estado = "comprado";
                 await producto.save();
-
             } else {
                 producto = await Producto.findById(item.producto_id);
 
@@ -377,6 +382,7 @@ const pagarCarritoController = async (req, res) => {
             });
         }
 
+        // 7. Crear la venta
         const nuevaVenta = new (mongoose.model("Ventas"))({
             cliente_id: cliente._id,
             productos: productosConDetalles,
@@ -386,12 +392,8 @@ const pagarCarritoController = async (req, res) => {
 
         await nuevaVenta.save();
 
-        // Armar manualmente productos en venta
-        const productosEnVenta = [];
-
-        for (const item of productosConDetalles) {
-            let producto = null;
-
+        // 8. Formatear productos para la respuesta
+        const productosEnVenta = productosConDetalles.map(item => {
             if (item.producto.tipo_producto === "personalizado" || item.producto.tipo_producto === "ia") {
                 const ingredientes = item.producto.ingredientes?.map(ing => ({
                     _id: ing._id,
@@ -399,35 +401,41 @@ const pagarCarritoController = async (req, res) => {
                     imagen: ing.imagen,
                 })) || [];
 
-                producto = {
-                    _id: item.producto._id,
-                    tipo: item.producto.tipo_producto,
-                    aroma: item.producto.aroma,
-                    imagen: item.producto.imagen || null,
-                    precio: item.producto.precio,
-                    ingredientes,
+                return {
+                    cantidad: item.cantidad,
+                    subtotal: item.subtotal,
+                    producto: {
+                        _id: item.producto._id,
+                        tipo: item.producto.tipo_producto,
+                        aroma: item.producto.aroma,
+                        imagen: item.producto.imagen || null,
+                        precio: item.producto.precio,
+                        ingredientes,
+                    }
                 };
             } else {
-                producto = {
-                    _id: item.producto._id,
-                    nombre: item.producto.nombre,
-                    descripcion: item.producto.descripcion,
-                    imagen: item.producto.imagen,
-                    precio: item.producto.precio,
+                return {
+                    cantidad: item.cantidad,
+                    subtotal: item.subtotal,
+                    producto: {
+                        _id: item.producto._id,
+                        nombre: item.producto.nombre,
+                        descripcion: item.producto.descripcion,
+                        imagen: item.producto.imagen,
+                        precio: item.producto.precio,
+                    }
                 };
             }
+        });
 
-            productosEnVenta.push({
-                cantidad: item.cantidad,
-                subtotal: item.subtotal,
-                producto,
-            });
-        }
-
+        // 9. Reiniciar el carrito
         carrito.productos = [];
         carrito.total = 0;
         carrito.estado = "pendiente";
         await carrito.save();
+
+        // 10. Enviar respuesta sin campos sensibles del cliente
+        const { password, token, codigoRecuperacion, codigoRecuperacionExpires, confirmEmail, estado, ...clienteSeguro } = cliente.toObject();
 
         return res.status(200).json({
             msg: "Pago exitoso.",
@@ -438,18 +446,18 @@ const pagarCarritoController = async (req, res) => {
                 estado: nuevaVenta.estado,
                 productos: productosEnVenta,
             },
-            cliente,
+            cliente: clienteSeguro,
         });
 
     } catch (error) {
-        console.error("Error al pagar el carrito:", error);
+        console.error(`[Carrito ${carrito?._id}] Error al pagar:`, error.message);
 
-        if (carrito) {
+        if (carrito && carrito.estado === "procesando") {
             try {
                 carrito.estado = "pendiente";
                 await carrito.save();
             } catch (e) {
-                console.error("Error restaurando estado del carrito:", e);
+                console.error("Error restaurando estado del carrito:", e.message);
             }
         }
 
