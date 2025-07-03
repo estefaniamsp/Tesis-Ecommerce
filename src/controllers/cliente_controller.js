@@ -253,10 +253,7 @@ const updateClienteProfile = async (req, res) => {
     if (esValorValido(campos.cedula) && !/^\d{10}$/.test(campos.cedula)) {
       return res.status(400).json({ msg: "La cédula debe tener exactamente 10 números" });
     }
-    if (esValorValido(campos.fecha_nacimiento) && !/^\d{4}-\d{2}-\d{2}$/.test(campos.fecha_nacimiento)) {
-      return res.status(400).json({ msg: "La fecha de nacimiento debe tener el formato YYYY-MM-DD" });
-    }
-    if (campos.fecha_nacimiento){
+    if (campos.fecha_nacimiento) {
       const fechaNacimiento = new Date(campos.fecha_nacimiento);
       const hoy = new Date();
       if (fechaNacimiento >= hoy) {
@@ -274,7 +271,7 @@ const updateClienteProfile = async (req, res) => {
     }
 
     const camposUnicos = ["cedula", "telefono"];
-    for (const [campo, valor] of camposValidos) {
+    for (let [campo, valor] of camposValidos) {
       if (valor !== cliente[campo] && camposUnicos.includes(campo)) {
         const existe = await Clientes.findOne({ [campo]: valor });
         if (existe && existe._id.toString() !== clienteId) {
