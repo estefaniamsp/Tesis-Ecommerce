@@ -83,7 +83,15 @@ const addCarritoController = async (req, res) => {
         if (tipo_producto === "personalizado" || tipo_producto === "ia") {
             producto = await ProductoPersonalizado.findById(producto_id.trim());
 
-            if (producto.estado !== "en_carrito") {
+            if (!producto || producto.cliente_id.toString() !== clienteId) {
+                return res.status(404).json({ msg: "Producto personalizado no encontrado o no te pertenece" });
+            }
+
+            if (producto.estado === "comprado") {
+                return res.status(400).json({ msg: "Este producto ya fue comprado y no puede volver al carrito." });
+            }
+
+            if (producto.estado === "guardado") {
                 producto.estado = "en_carrito";
                 await producto.save();
             }
@@ -101,7 +109,6 @@ const addCarritoController = async (req, res) => {
             }
         }
 
-        // 🔁 Cambiado: buscar carrito en más estados
         const carrito = await Carrito.findOne({
             cliente_id: clienteId,
             estado: { $in: ["pendiente", "procesando", "pagado"] }
@@ -250,7 +257,7 @@ const removeProductoCarritoController = async (req, res) => {
         if (tipo_producto === "personalizado" || tipo_producto === "ia") {
             const producto = await ProductoPersonalizado.findById(producto_id);
             if (producto && producto.estado === "en_carrito") {
-                producto.estado = "eliminado";
+                producto.estado = "guardado";
                 await producto.save();
             }
         }

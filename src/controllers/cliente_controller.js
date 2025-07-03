@@ -209,7 +209,6 @@ const updateClienteProfile = async (req, res) => {
     const clienteId = req.clienteBDD._id.toString();
     const body = req.body;
 
-    // Ignoramos cualquier intento de modificar el email
     const campos = {
       cedula: body.cedula?.trim(),
       nombre: body.nombre?.trim(),
@@ -228,7 +227,6 @@ const updateClienteProfile = async (req, res) => {
       return res.status(404).json({ msg: "Cliente no encontrado" });
     }
 
-    // Validar que al menos un campo válido fue enviado
     const camposValidos = Object.entries(campos).filter(
       ([, value]) => esValorValido(value)
     );
@@ -258,10 +256,26 @@ const updateClienteProfile = async (req, res) => {
     if (esValorValido(campos.fecha_nacimiento) && !/^\d{4}-\d{2}-\d{2}$/.test(campos.fecha_nacimiento)) {
       return res.status(400).json({ msg: "La fecha de nacimiento debe tener el formato YYYY-MM-DD" });
     }
+    if (campos.fecha_nacimiento){
+      const fechaNacimiento = new Date(campos.fecha_nacimiento);
+      const hoy = new Date();
+      if (fechaNacimiento >= hoy) {
+        return res.status(400).json({ msg: "La fecha de nacimiento no puede ser futura" });
+      }
 
-    // Verificar duplicados excepto email
+      const edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
+      const mes = hoy.getMonth() - fechaNacimiento.getMonth();
+      if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
+        edad--;
+      }
+      if (edad <= 18) {
+        return res.status(400).json({ msg: "Debes tener al menos 18 años para registrarte" });
+      }
+    }
+
+    const camposUnicos = ["cedula", "telefono"];
     for (const [campo, valor] of camposValidos) {
-      if (valor !== cliente[campo]) {
+      if (valor !== cliente[campo] && camposUnicos.includes(campo)) {
         const existe = await Clientes.findOne({ [campo]: valor });
         if (existe && existe._id.toString() !== clienteId) {
           return res.status(400).json({ msg: `El ${campo} ya está registrado por otro cliente` });
@@ -269,12 +283,10 @@ const updateClienteProfile = async (req, res) => {
       }
     }
 
-    // Actualizar solo campos válidos
     camposValidos.forEach(([key, value]) => {
       cliente[key] = value;
     });
 
-    // Procesar imagen si se sube
     if (req.file) {
       try {
         if (cliente.imagen_id) {
@@ -296,7 +308,7 @@ const updateClienteProfile = async (req, res) => {
         nombre: cliente.nombre,
         apellido: cliente.apellido,
         genero: cliente.genero,
-        email: cliente.email, // Se mantiene el original
+        email: cliente.email,
         direccion: cliente.direccion,
         telefono: cliente.telefono,
         fecha_nacimiento: cliente.fecha_nacimiento,

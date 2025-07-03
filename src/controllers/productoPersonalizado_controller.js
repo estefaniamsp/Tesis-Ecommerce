@@ -22,7 +22,7 @@ const getAllProductosPersonalizadosController = async (req, res) => {
 
         const productos = await ProductoPersonalizado.find({
             cliente_id: clienteId,
-            estado: { $in: ["en_carrito", "activo", "comprado"] }
+            estado: { $in: ["en_carrito", "activo"] }
         })
             .populate("ingredientes")
             .skip(skip)
@@ -31,7 +31,7 @@ const getAllProductosPersonalizadosController = async (req, res) => {
 
         const totalProductos = await ProductoPersonalizado.countDocuments({
             cliente_id: clienteId,
-            estado: { $in: ["en_carrito", "activo", "comprado"] }
+            estado: { $in: ["en_carrito", "activo"] }
         });
         const totalPaginas = Math.ceil(totalProductos / limit);
 
@@ -207,7 +207,7 @@ const createProductoPersonalizadoController = async (req, res) => {
 // Actualizar un producto personalizado
 const updateProductoPersonalizadoController = async (req, res) => {
     const { id } = req.params;
-    let { ingredientes } = req.body;
+    let { ingredientes, tipo_producto } = req.body;
 
     try {
         if (!req.clienteBDD) {
@@ -224,6 +224,16 @@ const updateProductoPersonalizadoController = async (req, res) => {
         }
         if (producto.cliente_id.toString() !== req.clienteBDD._id.toString()) {
             return res.status(403).json({ msg: "No tienes permiso para modificar este producto." });
+        }
+
+        // ✅ Validar y actualizar tipo_producto si se recibe
+        if (tipo_producto) {
+            tipo_producto = tipo_producto.toLowerCase().trim();
+            const valoresPermitidos = ["personalizado", "ia"];
+            if (!valoresPermitidos.includes(tipo_producto)) {
+                return res.status(400).json({ msg: "El tipo de producto debe ser 'personalizado' o 'ia'" });
+            }
+            producto.tipo_producto = tipo_producto;
         }
 
         if (typeof ingredientes === "string") ingredientes = [ingredientes];
@@ -295,6 +305,7 @@ const updateProductoPersonalizadoController = async (req, res) => {
         producto.ingredientes = ingredientes;
         producto.precio = ingredientesDB.reduce((acc, ing) => acc + ing.precio, 0);
         producto.aroma = aroma.nombre;
+
         await producto.save();
 
         const categoria = await mongoose.model("Categorias").findById(producto.id_categoria);
@@ -304,6 +315,7 @@ const updateProductoPersonalizadoController = async (req, res) => {
             producto_personalizado: {
                 _id: producto._id,
                 categoría: categoria?.nombre || "Sin categoría",
+                tipo: producto.tipo_producto,
                 aroma: producto.aroma,
                 molde,
                 color,

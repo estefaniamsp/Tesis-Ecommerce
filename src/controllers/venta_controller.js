@@ -37,6 +37,7 @@ const getAllVentasController = async (req, res) => {
           productos.push({
             producto_id: producto._id,
             nombre: producto.nombre,
+            descripcion: producto.descripcion,
             imagen: producto.imagen,
             precio: producto.precio,
             cantidad: item.cantidad,
@@ -50,7 +51,7 @@ const getAllVentasController = async (req, res) => {
           if (personalizado) {
             productos.push({
               producto_id: personalizado._id,
-              tipo: "personalizado",
+              tipo: personalizado.tipo_producto,
               aroma: personalizado.aroma,
               imagen: personalizado.imagen,
               precio: personalizado.precio,
@@ -58,7 +59,8 @@ const getAllVentasController = async (req, res) => {
               ingredientes: personalizado.ingredientes?.map(i => ({
                 _id: i._id,
                 nombre: i.nombre,
-                imagen: i.imagen
+                imagen: i.imagen,
+                tipo:i.tipo
               })),
               cantidad: item.cantidad,
               subtotal: item.subtotal
@@ -341,7 +343,7 @@ const getVentasClienteController = async (req, res) => {
           if (personalizado) {
             productos.push({
               producto_id: personalizado._id,
-              tipo: "personalizado",
+              tipo: personalizado.tipo_producto,
               aroma: personalizado.aroma,
               imagen: personalizado.imagen,
               precio: personalizado.precio,
@@ -465,8 +467,8 @@ const getDashboardController = async (req, res) => {
       });
     }
 
-    const inicio = new Date(`${fechaInicio}T00:00:00`);
-    const fin = new Date(`${fechaFin}T23:59:59`);
+    const inicio = new Date(`${fechaInicio}T00:00:00-05:00`); 
+    const fin = new Date(`${fechaFin}T23:59:59-05:00`); 
 
     if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
       return res.status(400).json({ msg: "Las fechas proporcionadas no son válidas." });
