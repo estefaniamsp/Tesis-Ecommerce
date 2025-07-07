@@ -14,7 +14,7 @@ const getAllVentasController = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const ventasRaw = await Ventas.find()
-      .populate("cliente_id", "nombre apellido email")
+      .populate("cliente_id", "nombre apellido email cedula direccion telefono")
       .skip(skip)
       .limit(limit)
       .sort({ fecha_venta: -1 });
@@ -97,7 +97,7 @@ const getVentaByIDController = async (req, res) => {
 
   try {
     const venta = await Ventas.findById(id)
-      .populate("cliente_id", "nombre apellido email");
+      .populate("cliente_id", "nombre apellido email cedula direccion telefono");
 
     if (!venta) {
       return res.status(404).json({ msg: "Venta no encontrada" });
@@ -179,7 +179,7 @@ const updateVentaController = async (req, res) => {
       id,
       { estado },
       { new: true }
-    ).populate("cliente_id", "nombre apellido email");
+    ).populate("cliente_id", "nombre apellido email cedula direccion telefono");
 
     if (!ventaActualizada) {
       return res.status(404).json({ msg: "Venta no encontrada" });
@@ -309,7 +309,7 @@ const getVentasClienteController = async (req, res) => {
     const clienteId = req.clienteBDD._id;
 
     const ventasRaw = await Ventas.find({ cliente_id: clienteId })
-      .populate("cliente_id", "nombre apellido email")
+      .populate("cliente_id", "nombre apellido email cedula direccion telefono")
       .sort({ fecha_venta: -1 });
 
     if (!ventasRaw || ventasRaw.length === 0) {
@@ -383,7 +383,7 @@ const getFacturaClienteById = async (req, res) => {
 
   try {
     const venta = await Ventas.findById(id)
-      .populate("cliente_id", "nombre apellido email");
+      .populate("cliente_id", "nombre apellido email cedula direccion telefono");
 
     if (!venta) {
       return res.status(404).json({ msg: "Venta no encontrada" });

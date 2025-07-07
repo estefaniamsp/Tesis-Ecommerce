@@ -22,7 +22,7 @@ const getAllProductosPersonalizadosController = async (req, res) => {
 
         const productos = await ProductoPersonalizado.find({
             cliente_id: clienteId,
-            estado: { $in: ["en_carrito", "activo"] }
+            estado: { $in: ["en_carrito", "activo", "guardado"] }
         })
             .populate("ingredientes")
             .skip(skip)
@@ -31,7 +31,7 @@ const getAllProductosPersonalizadosController = async (req, res) => {
 
         const totalProductos = await ProductoPersonalizado.countDocuments({
             cliente_id: clienteId,
-            estado: { $in: ["en_carrito", "activo"] }
+            estado: { $in: ["en_carrito", "activo", "guardado"] }
         });
         const totalPaginas = Math.ceil(totalProductos / limit);
 
@@ -76,11 +76,12 @@ const getProductoPersonalizadoByIDController = async (req, res) => {
 // Crear un nuevo producto personalizado
 const createProductoPersonalizadoController = async (req, res) => {
     try {
-        if (!req.clienteBDD) {
+        const cliente = req.clienteBDD;
+        if (!cliente) {
             return res.status(403).json({ msg: "Solo los clientes pueden crear productos personalizados." });
         }
 
-        let { ingredientes, id_categoria } = req.body;
+        let { ingredientes, id_categoria, tipo_producto } = req.body;
 
         if (!ingredientes || !id_categoria) {
             return res.status(400).json({
@@ -100,87 +101,72 @@ const createProductoPersonalizadoController = async (req, res) => {
             return res.status(400).json({ msg: "ID de categoría no válido." });
         }
 
+        // 🔎 Validar ingredientes
         const ingredientesEnBD = await Ingrediente.find({ _id: { $in: ingredientes } });
-
         if (ingredientesEnBD.length !== ingredientes.length) {
             return res.status(400).json({ msg: "Uno o más ingredientes no existen." });
         }
 
-        const ingredientesInvalidos = ingredientesEnBD.filter(ing =>
+        const noCorresponden = ingredientesEnBD.filter(ing =>
             !ing.id_categoria.map(id => id.toString()).includes(id_categoria)
         );
-
-        if (ingredientesInvalidos.length > 0) {
+        if (noCorresponden.length > 0) {
             return res.status(400).json({
                 msg: "Uno o más ingredientes no corresponden a la categoría seleccionada.",
-                ingredientesInvalidos: ingredientesInvalidos.map(i => i.nombre),
+                ingredientesInvalidos: noCorresponden.map(i => i.nombre),
             });
         }
 
-        let molde = null;
-        let color = null;
-        let aroma = null;
-        const esencias = [];
-        const idsUnicos = new Set();
+        // ✅ Validar y clasificar tipos
+        const { molde, color, aroma, esencias, error } = formatearIngredientes(ingredientesEnBD);
+        if (error) return res.status(400).json(error);
 
-        for (const ing of ingredientesEnBD) {
-            const tipo = ing.tipo.toLowerCase();
-
-            if (idsUnicos.has(ing._id.toString())) {
-                return res.status(400).json({ msg: `Ingrediente duplicado: ${ing.nombre}` });
-            }
-            idsUnicos.add(ing._id.toString());
-
-            const data = { _id: ing._id, nombre: ing.nombre, imagen: ing.imagen };
-
-            if (tipo === "molde") {
-                if (molde) return res.status(400).json({ msg: "Solo se permite un molde." });
-                molde = data;
-            } else if (["color", "colorante"].includes(tipo)) {
-                if (color) return res.status(400).json({ msg: "Solo se permite un color." });
-                color = data;
-            } else if (["esencia", "escencia", "fragancia"].includes(tipo)) {
-                esencias.push(data);
-            } else if (tipo === "aroma") {
-                if (aroma) return res.status(400).json({ msg: "Solo se permite un aroma." });
-                aroma = data;
-            }
-        }
-
-        const errores = [];
-        if (!molde) errores.push("Debe haber exactamente 1 molde.");
-        if (!color) errores.push("Debe haber exactamente 1 color.");
-        if (!aroma) errores.push("Debe haber exactamente 1 aroma.");
-        if (esencias.length < 2) errores.push("Faltan esencias, se requieren 2.");
-        if (esencias.length > 2) errores.push("Hay demasiadas esencias, solo se permiten 2.");
-
-        if (errores.length > 0) {
-            return res.status(400).json({ msg: "Validación de ingredientes fallida.", errores });
-        }
-
+        // 🔁 Buscar si ya existe uno igual
         const productoExistente = await ProductoPersonalizado.findOne({
-            cliente_id: req.clienteBDD._id,
+            cliente_id: cliente._id,
             id_categoria,
             ingredientes: { $all: ingredientes, $size: ingredientes.length }
         });
 
         if (productoExistente) {
+            if (productoExistente.estado === "guardado") {
+                productoExistente.estado = "activo";
+                await productoExistente.save();
+                await productoExistente.populate("ingredientes");
+                const categoria = await mongoose.model("Categorias").findById(productoExistente.id_categoria);
+
+                const clasificados = formatearIngredientes(productoExistente.ingredientes);
+
+                return res.status(200).json({
+                    msg: "Producto existente reactivado exitosamente.",
+                    producto_personalizado: {
+                        _id: productoExistente._id,
+                        categoria: categoria?.nombre?.toLowerCase() || "desconocida",
+                        aroma: productoExistente.aroma,
+                        tipo: productoExistente.tipo_producto,
+                        molde: clasificados.molde,
+                        color: clasificados.color,
+                        esencias: clasificados.esencias,
+                        estado: productoExistente.estado
+                    }
+                });
+            }
+
             return res.status(409).json({
                 msg: "Ya tienes un producto personalizado con estos mismos ingredientes."
             });
         }
 
+        // 🆕 Crear nuevo producto
         const precio = ingredientesEnBD.reduce((acc, ing) => acc + ing.precio, 0);
 
         const nuevoProducto = new ProductoPersonalizado({
-            cliente_id: req.clienteBDD._id,
+            cliente_id: cliente._id,
             ingredientes,
             id_categoria,
             precio,
             aroma: aroma.nombre,
-            tipo_producto: ["personalizado", "ia"].includes(req.body.tipo_producto)
-                ? req.body.tipo_producto
-                : "personalizado",
+            tipo_producto: ["personalizado", "ia"].includes(tipo_producto) ? tipo_producto : "personalizado",
             estado: "activo",
         });
 
@@ -198,11 +184,57 @@ const createProductoPersonalizadoController = async (req, res) => {
                 esencias,
             },
         });
+
     } catch (error) {
         console.error("Error al crear el producto personalizado:", error);
         return res.status(500).json({ msg: "Error al crear el producto personalizado", error: error.message });
     }
 };
+
+// 👉 Función auxiliar para clasificar ingredientes y validar duplicados
+function formatearIngredientes(ingredientesEnBD) {
+    let molde = null;
+    let color = null;
+    let aroma = null;
+    const esencias = [];
+    const idsUnicos = new Set();
+
+    for (const ing of ingredientesEnBD) {
+        const tipo = ing.tipo.toLowerCase();
+        const id = ing._id.toString();
+
+        if (idsUnicos.has(id)) {
+            return { error: { msg: `Ingrediente duplicado: ${ing.nombre}` } };
+        }
+        idsUnicos.add(id);
+
+        const data = { _id: ing._id, nombre: ing.nombre, imagen: ing.imagen };
+
+        if (tipo === "molde") {
+            if (molde) return { error: { msg: "Solo se permite un molde." } };
+            molde = data;
+        } else if (["color", "colorante"].includes(tipo)) {
+            if (color) return { error: { msg: "Solo se permite un color." } };
+            color = data;
+        } else if (tipo === "aroma") {
+            if (aroma) return { error: { msg: "Solo se permite un aroma." } };
+            aroma = data;
+        } else if (["esencia", "escencia", "fragancia"].includes(tipo)) {
+            esencias.push(data);
+        }
+    }
+
+    const errores = [];
+    if (!molde) errores.push("Debe haber exactamente 1 molde.");
+    if (!color) errores.push("Debe haber exactamente 1 color.");
+    if (!aroma) errores.push("Debe haber exactamente 1 aroma.");
+    if (esencias.length < 2) errores.push("Faltan esencias, se requieren 2.");
+    if (esencias.length > 2) errores.push("Hay demasiadas esencias, solo se permiten 2.");
+
+    if (errores.length > 0) return { error: { msg: "Validación de ingredientes fallida.", errores } };
+
+    return { molde, color, aroma, esencias };
+}
 
 // Actualizar un producto personalizado
 const updateProductoPersonalizadoController = async (req, res) => {
@@ -224,6 +256,9 @@ const updateProductoPersonalizadoController = async (req, res) => {
         }
         if (producto.cliente_id.toString() !== req.clienteBDD._id.toString()) {
             return res.status(403).json({ msg: "No tienes permiso para modificar este producto." });
+        }
+        if (producto.estado === "comprado") {
+            return res.status(400).json({ msg: "No puedes editar un producto ya comprado." });
         }
 
         // ✅ Validar y actualizar tipo_producto si se recibe
@@ -357,6 +392,11 @@ const updateImagenProductoPersonalizadoController = async (req, res) => {
             return res.status(403).json({ msg: "No tienes permiso para modificar este producto." });
         }
 
+        if (producto.estado === "comprado") {
+            await cloudinary.uploader.destroy(req.file.filename);
+            return res.status(400).json({ msg: "No puedes actualizar la imagen de un producto ya comprado." });
+        }
+
         // ✅ Si se envía tipo_producto y es diferente, avisar que no se puede modificar aquí
         if (
             req.body.tipo_producto &&
@@ -394,6 +434,7 @@ const updateImagenProductoPersonalizadoController = async (req, res) => {
 };
 
 // Eliminar un producto personalizado
+// Eliminar un producto personalizado (marcar como eliminado)
 const deleteProductoPersonalizadoController = async (req, res) => {
     try {
         if (!req.clienteBDD) {
@@ -426,8 +467,9 @@ const deleteProductoPersonalizadoController = async (req, res) => {
             }
         }
 
-        // Eliminar el producto personalizado
-        await producto.deleteOne();
+        // En lugar de eliminar, marcar como 'eliminado'
+        producto.estado = "eliminado";
+        await producto.save();
 
         // Eliminar referencias en carritos
         await Carrito.updateMany(
@@ -435,7 +477,7 @@ const deleteProductoPersonalizadoController = async (req, res) => {
             { $pull: { productos: { producto_id: producto._id } } }
         );
 
-        return res.status(200).json({ msg: "Producto personalizado eliminado correctamente y eliminado de los carritos." });
+        return res.status(200).json({ msg: "Producto personalizado marcado como eliminado y retirado de carritos." });
 
     } catch (error) {
         console.error("Error al eliminar producto personalizado:", error);

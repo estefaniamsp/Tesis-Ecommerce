@@ -33,7 +33,7 @@ const getCarritoClienteController = async (req, res) => {
             Producto.find({ _id: { $in: idsNormales } }),
             ProductoPersonalizado.find({
                 _id: { $in: idsPersonalizados },
-                estado: "en_carrito"
+                estado: { $in: ["en_carrito", "activo"] }
             }).populate("ingredientes")
         ]);
 
@@ -91,7 +91,7 @@ const addCarritoController = async (req, res) => {
                 return res.status(400).json({ msg: "Este producto ya fue comprado y no puede volver al carrito." });
             }
 
-            if (producto.estado === "guardado") {
+            if (["guardado", "activo"].includes(producto.estado)) {
                 producto.estado = "en_carrito";
                 await producto.save();
             }
