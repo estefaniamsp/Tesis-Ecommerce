@@ -85,7 +85,11 @@ const clienteSchema = new Schema(
       type: String,
       enum: ['activo', 'inactivo'],
       default: 'activo'
-    }
+    },
+    notificationPushToken:{
+      type: String,
+      trim: true,
+    },
   },
   {
     timestamps: true,

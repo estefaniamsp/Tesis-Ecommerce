@@ -15,6 +15,7 @@ import routerAuth from './routers/auth_routes.js'
 import routerIngrediente from './routers/ingrediente_routes.js'
 import routerProductoPersonalizado from './routers/productoPersonalizado_routes.js'
 import routerVistaProducto from './routers/vistaProducto_routes.js'
+import routerNotificacion from './routers/notificacion_routes.js'
 import { createAdmin } from './controllers/admin_controller.js';
 
 const app = express()
@@ -43,6 +44,7 @@ app.use('/api',routerPromocion)
 app.use('/api',routerIngrediente)
 app.use('/api',routerProductoPersonalizado)
 app.use('/api',routerVistaProducto)
+app.use('/api',routerNotificacion)
 app.use('/api',routerAuth)
 
 // Rutas 

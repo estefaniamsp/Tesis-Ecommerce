@@ -466,9 +466,15 @@ const getDashboardController = async (req, res) => {
         msg: "Se requieren los parámetros 'fechaInicio' y 'fechaFin'."
       });
     }
+    const ajustarZonaHoraria = (fechaString) => {
+      const fecha = new Date(fechaString);
+      fecha.setHours(5, 0, 0, 0);
+      return fecha;
+    };
 
-    const inicio = new Date(`${fechaInicio}T00:00:00-05:00`); 
-    const fin = new Date(`${fechaFin}T23:59:59-05:00`); 
+    const inicio = ajustarZonaHoraria(fechaInicio);
+    const fin = ajustarZonaHoraria(fechaFin);
+    fin.setHours(23, 59, 59, 999); 
 
     if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
       return res.status(400).json({ msg: "Las fechas proporcionadas no son válidas." });

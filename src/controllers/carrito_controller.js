@@ -91,7 +91,7 @@ const addCarritoController = async (req, res) => {
                 return res.status(400).json({ msg: "Este producto ya fue comprado y no puede volver al carrito." });
             }
 
-            if (["guardado", "activo"].includes(producto.estado)) {
+            if (["activo"].includes(producto.estado)) {
                 producto.estado = "en_carrito";
                 await producto.save();
             }
@@ -253,14 +253,6 @@ const removeProductoCarritoController = async (req, res) => {
         }
 
         carrito.total = parseFloat(carrito.productos.reduce((acc, p) => acc + p.subtotal, 0).toFixed(2));
-
-        if (tipo_producto === "personalizado" || tipo_producto === "ia") {
-            const producto = await ProductoPersonalizado.findById(producto_id);
-            if (producto && producto.estado === "en_carrito") {
-                producto.estado = "guardado";
-                await producto.save();
-            }
-        }
         await carrito.save();
 
         return res.status(200).json({ msg: "Producto eliminado del carrito", carrito });
@@ -280,15 +272,6 @@ const emptyCarritoController = async (req, res) => {
         });
 
         if (!carrito) return res.status(404).json({ msg: "Carrito no encontrado." });
-
-        // 👉 Actualizar estado de productos personalizados
-        for (const item of carrito.productos) {
-            if (item.tipo_producto === "personalizado" || item.tipo_producto === "ia") {
-                await ProductoPersonalizado.findByIdAndUpdate(item.producto_id, {
-                    estado: "guardado"
-                });
-            }
-        }
 
         carrito.productos = [];
         carrito.total = 0;

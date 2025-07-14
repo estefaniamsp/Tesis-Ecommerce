@@ -22,7 +22,7 @@ const getAllProductosPersonalizadosController = async (req, res) => {
 
         const productos = await ProductoPersonalizado.find({
             cliente_id: clienteId,
-            estado: { $in: ["en_carrito", "activo", "guardado"] }
+            estado: { $in: ["en_carrito", "activo"] }
         })
             .populate("ingredientes")
             .skip(skip)
@@ -31,7 +31,7 @@ const getAllProductosPersonalizadosController = async (req, res) => {
 
         const totalProductos = await ProductoPersonalizado.countDocuments({
             cliente_id: clienteId,
-            estado: { $in: ["en_carrito", "activo", "guardado"] }
+            estado: { $in: ["en_carrito", "activo"] }
         });
         const totalPaginas = Math.ceil(totalProductos / limit);
 
@@ -129,7 +129,7 @@ const createProductoPersonalizadoController = async (req, res) => {
         });
 
         if (productoExistente) {
-            if (productoExistente.estado === "guardado") {
+            if (productoExistente.estado === "comprado" || productoExistente.estado === "eliminado") {
                 productoExistente.estado = "activo";
                 await productoExistente.save();
                 await productoExistente.populate("ingredientes");
@@ -434,7 +434,6 @@ const updateImagenProductoPersonalizadoController = async (req, res) => {
 };
 
 // Eliminar un producto personalizado
-// Eliminar un producto personalizado (marcar como eliminado)
 const deleteProductoPersonalizadoController = async (req, res) => {
     try {
         if (!req.clienteBDD) {

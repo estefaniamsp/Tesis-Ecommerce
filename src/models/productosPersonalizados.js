@@ -40,7 +40,7 @@ const productoPersonalizadoSchema = new Schema(
         },
         estado: {
             type: String,
-            enum: ["activo", "en_carrito", "comprado", "guardado", "eliminado"],
+            enum: ["activo", "en_carrito", "comprado", "eliminado"],
             default: "activo"
         },
         tipo_producto: {
