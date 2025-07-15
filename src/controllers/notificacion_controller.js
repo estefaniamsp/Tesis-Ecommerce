@@ -72,7 +72,7 @@ const enviarNotificacionesClientes = async (req, res) => {
       body: JSON.stringify(notificacion),
     });
 
-    const { ok } = await response.json();
+    const { ok } = response;
 
     if (!ok) {
       return res.status(500).json({ msg: "Error al enviar las notificaciones" });
