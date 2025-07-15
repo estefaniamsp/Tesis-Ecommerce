@@ -342,7 +342,8 @@ const getClienteProfile = async (req, res) => {
         direccion: cliente.direccion,
         telefono: cliente.telefono,
         fecha_nacimiento: cliente.fecha_nacimiento,
-        imagen: cliente.imagen
+        imagen: cliente.imagen,
+        notificationPushToken: cliente.notificationPushToken || null
       }
     });
 

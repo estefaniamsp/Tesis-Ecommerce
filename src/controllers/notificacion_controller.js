@@ -1,7 +1,7 @@
 import Clientes from "../models/clientes.js";
 import Notificaciones from "../models/notificaciones.js";
 
-export const actualizarTokenNotificacion = async (req, res) => {
+const   actualizarTokenNotificacion = async (req, res) => {
   try {
     const clienteId = req.clienteBDD._id.toString();
     const { pushToken } = req.params;
@@ -28,7 +28,7 @@ export const actualizarTokenNotificacion = async (req, res) => {
   }
 };
 
-export const enviarNotificacionesClientes = async (req, res) => {
+const enviarNotificacionesClientes = async (req, res) => {
   try {
     const admin = req.adminBDD._id.toString();
 
@@ -94,7 +94,7 @@ export const enviarNotificacionesClientes = async (req, res) => {
   }
 };
 
-export const obtenerNotificacionesCliente = async (req, res) => {
+const obtenerNotificacionesCliente = async (req, res) => {
   try {
     const clienteId = req.clienteBDD._id;
 
@@ -112,7 +112,7 @@ export const obtenerNotificacionesCliente = async (req, res) => {
   }
 };
 
-export const obtenerTodasNotificacionesEnviadas = async (req, res) => {
+const obtenerTodasNotificacionesEnviadas = async (req, res) => {
   try {
     const admin = req.adminBDD._id.toString();
 
@@ -147,4 +147,11 @@ export const obtenerTodasNotificacionesEnviadas = async (req, res) => {
     console.error("Error al obtener notificaciones:", error);
     return res.status(500).json({ msg: "Error del servidor al obtener las notificaciones" });
   }
+};
+
+export {
+  actualizarTokenNotificacion,
+  enviarNotificacionesClientes,
+  obtenerNotificacionesCliente,
+  obtenerTodasNotificacionesEnviadas,
 };
