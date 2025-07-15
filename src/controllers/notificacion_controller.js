@@ -78,15 +78,15 @@ const enviarNotificacionesClientes = async (req, res) => {
       return res.status(500).json({ msg: "Error al enviar las notificaciones" });
     }
 
-    clientes.forEach(async ({ _id }) => {
+    for (const cliente of clientes) {
       const notificacion = new Notificaciones({
-        cliente: _id,
+        cliente: cliente._id,
         titulo,
         mensaje,
         imagen,
       });
       await notificacion.save();
-    });
+    };
 
     return res.status(200).json({ msg: "Notificaciones enviadas a todos los clientes" });
   } catch (error) {
@@ -106,7 +106,7 @@ const obtenerNotificacionesCliente = async (req, res) => {
       return res.status(404).json({ msg: "No hay notificaciones para este cliente" });
     }
 
-    return res.status(200).json(notificaciones);
+    return res.status(200).json({notificaciones});
   } catch (error) {
     return res.status(500).json({ msg: "Error del servidor al obtener las notificaciones" });
   }
@@ -142,7 +142,7 @@ const obtenerTodasNotificacionesEnviadas = async (req, res) => {
       return res.status(404).json({ msg: "No hay notificaciones" });
     }
 
-    return res.status(200).json(notificaciones);
+    return res.status(200).json({notificaciones});
   } catch (error) {
     console.error("Error al obtener notificaciones:", error);
     return res.status(500).json({ msg: "Error del servidor al obtener las notificaciones" });
