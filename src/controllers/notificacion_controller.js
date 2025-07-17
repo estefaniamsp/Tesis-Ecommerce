@@ -57,7 +57,7 @@ const enviarNotificacionesClientes = async (req, res) => {
       sound: "default",
       title: titulo,
       body: mensaje,
-      data: {
+      richContent: {
         image: imagen,
       },
     };
