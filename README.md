@@ -32,6 +32,6 @@ Para iniciar el proyecto, corre el siguiente comadndo:
 npm run dev
 
 # 📁 Documentación detallada del proyecto de Tesis
-- 📄 [Ver Tesis (PDF)]
-- 🧾 [Formulario 233 (PDF)]
+- 📄 [Ver Tesis (PDF)] (https://github.com/estefaniamsp/Tesis-Ecommerce/blob/main/Tesis-Final_Estefania_Sánchez.pdf)
+- 🧾 [Formulario 233 (PDF)] (https://github.com/estefaniamsp/Tesis-Ecommerce/blob/main/F_AA_233.pdf)
 - 📌 [Video de Funcionalidad] (https://youtu.be/30zP7An7qwg?si=RePLnCJ6Y-71Mlry)
