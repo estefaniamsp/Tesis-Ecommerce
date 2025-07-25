@@ -59,7 +59,7 @@ const enviarNotificacionesClientes = async (req, res) => {
         notificationPushToken: {
           $exists: true,
           $ne: null,
-          $regex: /^ExpoPushToken\[[a-zA-Z0-9_-]+\]/,
+          $regex: /^ExponentPushToken\[[a-zA-Z0-9_-]+\]/,
         },
       }).select("_id notificationPushToken");
 
