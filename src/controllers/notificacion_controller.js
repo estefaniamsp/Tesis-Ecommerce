@@ -119,7 +119,7 @@ const obtenerNotificacionesCliente = async (req, res) => {
 
     const notificaciones = await Notificaciones.find({
       clientes: { $in: [clienteId] },
-    });
+    }).select("titulo mensaje imagen createdAt");
 
     if (notificaciones.length === 0) {
       return res.status(404).json({ msg: "No hay notificaciones para este cliente" });

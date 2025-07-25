@@ -260,7 +260,7 @@ const updateClienteProfile = async (req, res) => {
         return res.status(400).json({ msg: "La fecha de nacimiento no puede ser futura" });
       }
 
-      const edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
+      let edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
       const mes = hoy.getMonth() - fechaNacimiento.getMonth();
       if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
         edad--;

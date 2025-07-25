@@ -4,11 +4,9 @@ const notificationsSchema = new Schema(
   {
     clientes: [
       {
-        cliente_id: {
-          type: Types.ObjectId,
-          ref: "Clientes",
-          required: true,
-        },
+        type: Types.ObjectId,
+        ref: "Clientes",
+        required: true,
       },
     ],
     titulo: {
