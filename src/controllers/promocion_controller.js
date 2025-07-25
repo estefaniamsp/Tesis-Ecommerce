@@ -15,8 +15,10 @@ const getAllPromocionesController = async (req, res) => {
 
         const skip = (page - 1) * limit;
 
+        const { resolucion = 'escritorio' } = req.query;
+
         // Obtener las promociones con paginación
-        const promociones = await Promocion.find()
+        const promociones = await Promocion.find({ resolucion })
             .skip(skip)
             .limit(limit);
 
@@ -65,7 +67,7 @@ const getPromocionByIdController = async (req, res) => {
 
 // Crear una nueva promoción
 const createPromocionController = async (req, res) => {
-    let { nombre } = req.body;
+    let { nombre, resolucion = "escritorio" } = req.body;
 
     if (!nombre || !req.file) {
         return res.status(400).json({ msg: "Todos los campos son obligatorios" });
@@ -88,6 +90,7 @@ const createPromocionController = async (req, res) => {
 
         const nuevaPromocion = new Promocion({
             nombre,
+            resolucion,
             imagen: req.file.path,
             imagen_id: req.file.filename,
         });

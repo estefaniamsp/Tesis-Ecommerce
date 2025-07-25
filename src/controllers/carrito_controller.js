@@ -14,7 +14,7 @@ const getCarritoClienteController = async (req, res) => {
 
         const carrito = await Carrito.findOne({
             cliente_id: clienteId,
-            estado: { $in: ["pendiente", "procesando", "pagado"] }
+            estado: { $in: ["pendiente", "procesando", "pagado"] },
         });
 
         if (!carrito) {
@@ -22,26 +22,25 @@ const getCarritoClienteController = async (req, res) => {
         }
 
         const idsNormales = carrito.productos
-            .filter(p => p.tipo_producto === "normal")
-            .map(p => p.producto_id);
+            .filter((p) => p.tipo_producto === "normal")
+            .map((p) => p.producto_id);
 
         const idsPersonalizados = carrito.productos
-            .filter(p => p.tipo_producto === "personalizado" || p.tipo_producto === "ia")
-            .map(p => p.producto_id);
+            .filter((p) => p.tipo_producto === "personalizado" || p.tipo_producto === "ia")
+            .map((p) => p.producto_id);
 
         const [productosNormales, productosPersonalizados] = await Promise.all([
             Producto.find({ _id: { $in: idsNormales } }),
             ProductoPersonalizado.find({
                 _id: { $in: idsPersonalizados },
-                estado: { $in: ["en_carrito", "activo"] }
-            }).populate("ingredientes")
+                estado: { $in: ["en_carrito", "activo"] },
+            }).populate("ingredientes"),
         ]);
 
-        const productosEnriquecidos = carrito.productos.map(item => {
-            const encontrado = (item.tipo_producto === "normal"
-                ? productosNormales
-                : productosPersonalizados
-            ).find(p => p._id.toString() === item.producto_id.toString());
+        const productosEnriquecidos = carrito.productos.map((item) => {
+            const encontrado = (
+                item.tipo_producto === "normal" ? productosNormales : productosPersonalizados
+            ).find((p) => p._id.toString() === item.producto_id.toString());
 
             return {
                 ...item.toObject(),
@@ -53,7 +52,7 @@ const getCarritoClienteController = async (req, res) => {
             carrito: {
                 ...carrito.toObject(),
                 productos: productosEnriquecidos,
-            }
+            },
         });
     } catch (error) {
         console.error("Error al obtener el carrito del cliente:", error);
@@ -84,11 +83,15 @@ const addCarritoController = async (req, res) => {
             producto = await ProductoPersonalizado.findById(producto_id.trim());
 
             if (!producto || producto.cliente_id.toString() !== clienteId) {
-                return res.status(404).json({ msg: "Producto personalizado no encontrado o no te pertenece" });
+                return res
+                    .status(404)
+                    .json({ msg: "Producto personalizado no encontrado o no te pertenece" });
             }
 
             if (producto.estado === "comprado") {
-                return res.status(400).json({ msg: "Este producto ya fue comprado y no puede volver al carrito." });
+                return res
+                    .status(400)
+                    .json({ msg: "Este producto ya fue comprado y no puede volver al carrito." });
             }
 
             if (["activo"].includes(producto.estado)) {
@@ -111,7 +114,7 @@ const addCarritoController = async (req, res) => {
 
         const carrito = await Carrito.findOne({
             cliente_id: clienteId,
-            estado: { $in: ["pendiente", "procesando", "pagado"] }
+            estado: { $in: ["pendiente", "procesando", "pagado"] },
         });
 
         if (!carrito) {
@@ -119,7 +122,8 @@ const addCarritoController = async (req, res) => {
         }
 
         const index = carrito.productos.findIndex(
-            (p) => p.producto_id.toString() === producto._id.toString() && p.tipo_producto === tipo_producto
+            (p) =>
+                p.producto_id.toString() === producto._id.toString() && p.tipo_producto === tipo_producto
         );
 
         let nuevaCantidadTotal = cantidad;
@@ -135,9 +139,10 @@ const addCarritoController = async (req, res) => {
 
         if (index >= 0) {
             carrito.productos[index].cantidad += cantidad;
-            carrito.productos[index].subtotal = Math.round(
-                carrito.productos[index].cantidad * carrito.productos[index].precio_unitario * 100
-            ) / 100;
+            carrito.productos[index].subtotal =
+                Math.round(
+                    carrito.productos[index].cantidad * carrito.productos[index].precio_unitario * 100
+                ) / 100;
         } else {
             carrito.productos.push({
                 producto_id: producto._id,
@@ -148,7 +153,8 @@ const addCarritoController = async (req, res) => {
             });
         }
 
-        carrito.total = Math.round(carrito.productos.reduce((acc, p) => acc + p.subtotal, 0) * 100) / 100;
+        carrito.total =
+            Math.round(carrito.productos.reduce((acc, p) => acc + p.subtotal, 0) * 100) / 100;
         await carrito.save();
 
         return res.status(200).json({ msg: "Producto agregado al carrito", carrito });
@@ -169,7 +175,7 @@ const updateCantidadProductoController = async (req, res) => {
     try {
         const carrito = await Carrito.findOne({
             cliente_id: clienteId,
-            estado: { $in: ["pendiente", "procesando", "pagado"] }
+            estado: { $in: ["pendiente", "procesando", "pagado"] },
         });
 
         if (!carrito) return res.status(404).json({ msg: "Carrito no encontrado." });
@@ -212,7 +218,8 @@ const updateCantidadProductoController = async (req, res) => {
             mensaje = `Cantidad actualizada para: ${producto.nombre}`;
         }
 
-        carrito.total = Math.round(carrito.productos.reduce((acc, p) => acc + p.subtotal, 0) * 100) / 100;
+        carrito.total =
+            Math.round(carrito.productos.reduce((acc, p) => acc + p.subtotal, 0) * 100) / 100;
         await carrito.save();
 
         res.status(200).json({ msg: mensaje, carrito });
@@ -237,7 +244,7 @@ const removeProductoCarritoController = async (req, res) => {
     try {
         const carrito = await Carrito.findOne({
             cliente_id: clienteId,
-            estado: { $in: ["pendiente", "procesando", "pagado"] }
+            estado: { $in: ["pendiente", "procesando", "pagado"] },
         });
 
         if (!carrito) return res.status(404).json({ msg: "Carrito no encontrado." });
@@ -249,10 +256,14 @@ const removeProductoCarritoController = async (req, res) => {
         );
 
         if (carrito.productos.length === productosIniciales) {
-            return res.status(404).json({ msg: "El producto no fue encontrado en el carrito con ese tipo." });
+            return res
+                .status(404)
+                .json({ msg: "El producto no fue encontrado en el carrito con ese tipo." });
         }
 
-        carrito.total = parseFloat(carrito.productos.reduce((acc, p) => acc + p.subtotal, 0).toFixed(2));
+        carrito.total = parseFloat(
+            carrito.productos.reduce((acc, p) => acc + p.subtotal, 0).toFixed(2)
+        );
         await carrito.save();
 
         return res.status(200).json({ msg: "Producto eliminado del carrito", carrito });
@@ -268,7 +279,7 @@ const emptyCarritoController = async (req, res) => {
     try {
         const carrito = await Carrito.findOne({
             cliente_id: clienteId,
-            estado: { $in: ["pendiente", "procesando", "pagado"] }
+            estado: { $in: ["pendiente", "procesando", "pagado"] },
         });
 
         if (!carrito) return res.status(404).json({ msg: "Carrito no encontrado." });
@@ -285,36 +296,20 @@ const emptyCarritoController = async (req, res) => {
     }
 };
 
-const pagarCarritoController = async (req, res) => {
+const crearIntentoPagoController = async (req, res) => {
     const clienteId = req.clienteBDD._id.toString();
-    const { paymentMethodId } = req.body;
-
-    if (!paymentMethodId) {
-        return res.status(400).json({ msg: "paymentMethodId es requerido" });
-    }
-
-    let carrito;
 
     try {
-        // 1. Buscar carrito sin actualizar aún
-        carrito = await Carrito.findOne({ cliente_id: clienteId, estado: "pendiente" });
-
-        if (!carrito || carrito.productos.length === 0 || carrito.total <= 0) {
-            return res.status(400).json({ msg: "No se puede procesar el carrito." });
-        }
-
-        // 2. Validar existencia de cliente
         const cliente = await Clientes.findById(clienteId);
-        if (!cliente) {
-            return res.status(404).json({ msg: "Cliente no encontrado." });
-        }
+        if (!cliente) return res.status(404).json({ msg: "Cliente no encontrado" });
 
-        // 3. Cambiar estado a "procesando"
-        carrito.estado = "procesando";
-        await carrito.save();
+        const carrito = await Carrito.findOne({ cliente_id: clienteId, estado: "pendiente" });
 
-        // 4. Verificar o crear cliente en Stripe
-        let [stripeCliente] = (await stripe.customers.list({ email: cliente.email, limit: 1 })).data || [];
+        if (!carrito || carrito.total <= 0) return res.status(400).json({ msg: "Carrito vacío" });
+
+        let [stripeCliente] =
+            (await stripe.customers.list({ email: cliente.email, limit: 1 })).data || [];
+
         if (!stripeCliente) {
             stripeCliente = await stripe.customers.create({
                 name: `${cliente.nombre} ${cliente.apellido}`,
@@ -322,20 +317,64 @@ const pagarCarritoController = async (req, res) => {
             });
         }
 
-        // 5. Crear intento de pago
-        const payment = await stripe.paymentIntents.create({
+        const ephemeralKey = await stripe.ephemeralKeys.create(
+            { customer: stripeCliente.id },
+            {
+                apiVersion: "2025-06-30.basil",
+            }
+        );
+
+        const paymentIntent = await stripe.paymentIntents.create({
             amount: Math.round(carrito.total * 100),
             currency: "USD",
-            description: `Pago del carrito del cliente ${cliente.nombre}`,
-            payment_method: paymentMethodId,
-            confirm: true,
             customer: stripeCliente.id,
-            automatic_payment_methods: { enabled: true, allow_redirects: "never" }
+            automatic_payment_methods: { enabled: true },
         });
 
-        if (payment.status !== "succeeded") throw new Error("El pago no fue exitoso");
+        return res.status(200).json({
+            paymentIntentClientSecret: paymentIntent.client_secret,
+            paymentIntentId: paymentIntent.id,
+            ephemeralKey: ephemeralKey.secret,
+            customer: stripeCliente.id,
+        });
+    } catch (error) {
+        console.error("Error al crear intento de pago:", error.message);
+        return res.status(500).json({ msg: "Error creando intento de pago", error: error.message });
+    }
+};
 
-        // 6. Procesar productos del carrito
+const finalizarPagoCarritoController = async (req, res) => {
+    const clienteId = req.clienteBDD._id.toString();
+    const { paymentIntentId } = req.body;
+
+    if (!paymentIntentId) {
+        return res.status(400).json({ msg: "paymentIntentId es requerido." });
+    }
+
+    let carrito;
+
+    try {
+        // 1. Validar el Intento de pago
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+        if (!paymentIntent || paymentIntent.status !== "succeeded") {
+            return res.status(400).json({ msg: "El pago no fue exitoso." });
+        }
+
+        // 2. Buscar cliente y carrito pendiente
+        const cliente = await Clientes.findById(clienteId);
+        if (!cliente) return res.status(404).json({ msg: "Cliente no encontrado." });
+
+        carrito = await Carrito.findOne({ cliente_id: clienteId, estado: "pendiente" });
+        if (!carrito || carrito.productos.length === 0 || carrito.total <= 0) {
+            return res.status(400).json({ msg: "Carrito inválido o vacío." });
+        }
+
+        // 3. Cambiar estado a "procesando"
+        carrito.estado = "procesando";
+        await carrito.save();
+
+        // 4. Procesar productos del carrito
         const productosConDetalles = [];
 
         for (const item of carrito.productos) {
@@ -372,7 +411,7 @@ const pagarCarritoController = async (req, res) => {
             });
         }
 
-        // 7. Crear la venta
+        // 5. Crear la venta
         const nuevaVenta = new (mongoose.model("Ventas"))({
             cliente_id: cliente._id,
             productos: productosConDetalles,
@@ -382,14 +421,15 @@ const pagarCarritoController = async (req, res) => {
 
         await nuevaVenta.save();
 
-        // 8. Formatear productos para la respuesta
-        const productosEnVenta = productosConDetalles.map(item => {
+        // 6. Formatear productos
+        const productosEnVenta = productosConDetalles.map((item) => {
             if (item.producto.tipo_producto === "personalizado" || item.producto.tipo_producto === "ia") {
-                const ingredientes = item.producto.ingredientes?.map(ing => ({
-                    _id: ing._id,
-                    nombre: ing.nombre,
-                    imagen: ing.imagen,
-                })) || [];
+                const ingredientes =
+                    item.producto.ingredientes?.map((ing) => ({
+                        _id: ing._id,
+                        nombre: ing.nombre,
+                        imagen: ing.imagen,
+                    })) || [];
 
                 return {
                     cantidad: item.cantidad,
@@ -401,7 +441,7 @@ const pagarCarritoController = async (req, res) => {
                         imagen: item.producto.imagen || null,
                         precio: item.producto.precio,
                         ingredientes,
-                    }
+                    },
                 };
             } else {
                 return {
@@ -413,22 +453,30 @@ const pagarCarritoController = async (req, res) => {
                         descripcion: item.producto.descripcion,
                         imagen: item.producto.imagen,
                         precio: item.producto.precio,
-                    }
+                    },
                 };
             }
         });
 
-        // 9. Reiniciar el carrito
+        // 7. Reiniciar el carrito
         carrito.productos = [];
         carrito.total = 0;
         carrito.estado = "pendiente";
         await carrito.save();
 
-        // 10. Enviar respuesta sin campos sensibles del cliente
-        const { password, token, codigoRecuperacion, codigoRecuperacionExpires, confirmEmail, estado, ...clienteSeguro } = cliente.toObject();
+        // 8. Enviar respuesta
+        const {
+            password,
+            token,
+            codigoRecuperacion,
+            codigoRecuperacionExpires,
+            confirmEmail,
+            estado,
+            ...clienteSeguro
+        } = cliente.toObject();
 
         return res.status(200).json({
-            msg: "Pago exitoso.",
+            msg: "Compra finalizada correctamente.",
             venta: {
                 _id: nuevaVenta._id,
                 cliente_id: nuevaVenta.cliente_id,
@@ -438,9 +486,8 @@ const pagarCarritoController = async (req, res) => {
             },
             cliente: clienteSeguro,
         });
-
     } catch (error) {
-        console.error(`[Carrito ${carrito?._id}] Error al pagar:`, error.message);
+        console.error(`[Carrito ${carrito?._id}] Error al finalizar pago:`, error.message);
 
         if (carrito && carrito.estado === "procesando") {
             try {
@@ -451,7 +498,7 @@ const pagarCarritoController = async (req, res) => {
             }
         }
 
-        return res.status(500).json({ msg: "Error al procesar el pago", error: error.message });
+        return res.status(500).json({ msg: "Error al finalizar la compra", error: error.message });
     }
 };
 
@@ -461,5 +508,6 @@ export {
     updateCantidadProductoController,
     removeProductoCarritoController,
     emptyCarritoController,
-    pagarCarritoController
+    crearIntentoPagoController,
+    finalizarPagoCarritoController,
 };

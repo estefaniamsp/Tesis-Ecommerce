@@ -2,11 +2,15 @@ import { Schema, model, Types } from "mongoose";
 
 const notificationsSchema = new Schema(
   {
-    cliente: {
-      type: Types.ObjectId,
-      ref: "Clientes",
-      required: true,
-    },
+    clientes: [
+      {
+        cliente_id: {
+          type: Types.ObjectId,
+          ref: "Clientes",
+          required: true,
+        },
+      },
+    ],
     titulo: {
       type: String,
       required: true,

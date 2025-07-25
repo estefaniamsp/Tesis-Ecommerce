@@ -1,7 +1,7 @@
 import Clientes from "../models/clientes.js";
 import Notificaciones from "../models/notificaciones.js";
 
-const   actualizarTokenNotificacion = async (req, res) => {
+const actualizarTokenNotificacion = async (req, res) => {
   try {
     const clienteId = req.clienteBDD._id.toString();
     const { pushToken } = req.params;
@@ -36,21 +36,42 @@ const enviarNotificacionesClientes = async (req, res) => {
       return res.status(403).json({ msg: "Acceso denegado, usuario no autorizado" });
     }
 
-    const { titulo, mensaje, imagen } = req.body;
+    const { titulo, mensaje, imagen, clienteId } = req.body;
 
     if (!titulo || !mensaje || !imagen) {
       return res.status(400).json({ msg: "Título y mensaje son obligatorios" });
     }
 
-    const clientes = await Clientes.find({
-      notificationPushToken: { $exists: true, $ne: null },
-    }).select("_id notificationPushToken");
+    let tokens = [];
+    let clientesId = [];
 
-    if (clientes.length === 0) {
-      return res.status(404).json({ msg: "No hay clientes con tokens de notificación" });
+    if (clienteId) {
+      const { notificationPushToken = null } = await Clientes.findById(clienteId).select(
+        "notificationPushToken"
+      );
+
+      if (notificationPushToken) {
+        tokens.push(notificationPushToken);
+        clientesId.push(clienteId);
+      }
+    } else {
+      const clientes = await Clientes.find({
+        notificationPushToken: {
+          $exists: true,
+          $ne: null,
+          $regex: /^ExpoPushToken\[[a-zA-Z0-9_-]+\]/,
+        },
+      }).select("_id notificationPushToken");
+
+      if (clientes.length === 0) {
+        return res.status(404).json({ msg: "No hay clientes con tokens de notificación" });
+      }
+
+      clientes.forEach(({ notificationPushToken, _id }) => {
+        tokens.push(notificationPushToken);
+        clientesId.push(_id);
+      });
     }
-
-    const tokens = clientes.map(({ notificationPushToken }) => notificationPushToken);
 
     const notificacion = {
       to: tokens,
@@ -78,15 +99,13 @@ const enviarNotificacionesClientes = async (req, res) => {
       return res.status(500).json({ msg: "Error al enviar las notificaciones" });
     }
 
-    for (const cliente of clientes) {
-      const notificacion = new Notificaciones({
-        cliente: cliente._id,
-        titulo,
-        mensaje,
-        imagen,
-      });
-      await notificacion.save();
-    };
+    const notificacionBDD = new Notificaciones({
+      clientes: clientesId,
+      titulo,
+      mensaje,
+      imagen,
+    });
+    await notificacionBDD.save();
 
     return res.status(200).json({ msg: "Notificaciones enviadas a todos los clientes" });
   } catch (error) {
@@ -96,17 +115,17 @@ const enviarNotificacionesClientes = async (req, res) => {
 
 const obtenerNotificacionesCliente = async (req, res) => {
   try {
-    const clienteId = req.clienteBDD._id;
+    const clienteId = req.clienteBDD._id.toString();
 
-    const notificaciones = await Notificaciones.find({ cliente: clienteId })
-      .sort({ fechaEnvio: -1 })
-      .select("-__v");
+    const notificaciones = await Notificaciones.find({
+      clientes: { $in: [clienteId] },
+    });
 
     if (notificaciones.length === 0) {
       return res.status(404).json({ msg: "No hay notificaciones para este cliente" });
     }
 
-    return res.status(200).json({notificaciones});
+    return res.status(200).json({ notificaciones });
   } catch (error) {
     return res.status(500).json({ msg: "Error del servidor al obtener las notificaciones" });
   }
@@ -120,29 +139,13 @@ const obtenerTodasNotificacionesEnviadas = async (req, res) => {
       return res.status(403).json({ msg: "Acceso denegado, usuario no autorizado" });
     }
 
-    const notificaciones = await Notificaciones.aggregate([
-      {
-        $group: {
-          _id: "$titulo",
-          doc: { $first: "$$ROOT" },
-        },
-      },
-      {
-        $replaceRoot: { newRoot: "$doc" },
-      },
-      {
-        $project: { __v: 0 },
-      },
-      {
-        $sort: { fechaEnvio: -1 },
-      },
-    ]);
+    const notificaciones = await Notificaciones.find();
 
     if (notificaciones.length === 0) {
       return res.status(404).json({ msg: "No hay notificaciones" });
     }
 
-    return res.status(200).json({notificaciones});
+    return res.status(200).json({ notificaciones });
   } catch (error) {
     console.error("Error al obtener notificaciones:", error);
     return res.status(500).json({ msg: "Error del servidor al obtener las notificaciones" });

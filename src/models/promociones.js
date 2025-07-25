@@ -9,12 +9,17 @@ const promocionSchema = new mongoose.Schema(
       maxLength: 100,
     },
     imagen: {
-      type: String, // URL de la imagen subida a Cloudinary
+      type: String, 
       required: true,
     },
     imagen_id: {
-      type: String, // ID que Cloudinary devuelve para poder eliminar la imagen después
+      type: String, 
       required: true,
+    },
+    resolucion: {
+      type: String,
+      required: true,
+      enum: ["escritorio", "móvil"],
     },
   },
   {
@@ -22,7 +27,7 @@ const promocionSchema = new mongoose.Schema(
     toJSON: {
       transform(doc, ret) {
         delete ret.__v;
-        delete ret.imagen_id; 
+        delete ret.imagen_id;
       },
     },
   }
