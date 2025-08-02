@@ -10,21 +10,39 @@ import cloudinary from "../config/cloudinary.js";
 
 // Registrar cliente
 const registerCliente = async (req, res) => {
-  let { nombre, apellido, genero, email, password } = req.body;
+  let { nombre, apellido, genero, email, password, fecha_nacimiento } = req.body;
 
   nombre = nombre?.trim();
   apellido = apellido?.trim();
   genero = genero?.trim();
   email = email?.trim().toLowerCase();
   password = password?.trim();
+  fecha_nacimiento = fecha_nacimiento?.trim();
 
-  if (!nombre || !apellido || !genero || !email || !password) {
+  if (!nombre || !apellido || !genero || !email || !password || !fecha_nacimiento) {
     return res.status(400).json({ msg: "Todos los campos son obligatorios" });
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return res.status(400).json({ msg: "El correo ingresado no es válido" });
+  }
+
+  const fechaNacimientoDate = new Date(fecha_nacimiento);
+  const hoy = new Date();
+  if (isNaN(fechaNacimientoDate.getTime())) {
+    return res.status(400).json({ msg: "La fecha de nacimiento no es válida" });
+  }
+  if (fechaNacimientoDate >= hoy) {
+    return res.status(400).json({ msg: "La fecha de nacimiento no puede ser futura" });
+  }
+  let edad = hoy.getFullYear() - fechaNacimientoDate.getFullYear();
+  const mes = hoy.getMonth() - fechaNacimientoDate.getMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimientoDate.getDate())) {
+    edad--;
+  }
+  if (edad < 18) {
+    return res.status(400).json({ msg: "Debes tener al menos 18 años para registrarte" });
   }
 
   const verificarEmailBDD = await Clientes.findOne({ email });
@@ -43,6 +61,7 @@ const registerCliente = async (req, res) => {
       apellido,
       genero,
       email,
+      fecha_nacimiento: fechaNacimientoDate,
       password: await bcrypt.hash(password, 10)
     });
 

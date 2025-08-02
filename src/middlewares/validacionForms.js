@@ -71,7 +71,12 @@ export const validarCliente = [
         .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,20}$/)
         .withMessage("Debe contener al menos una mayúscula, una minúscula, un número y un carácter especial (@$!%*?&).")
         .notEmpty()
-        .withMessage("El campo 'password' es obligatorio")
+        .withMessage("El campo 'password' es obligatorio"),
+    
+    check("fecha_nacimiento")
+        .optional()
+        .matches(/^\d{4}-\d{2}-\d{2}$/)
+        .withMessage("La fecha de nacimiento debe tener el formato YYYY-MM-DD."),
 ];
 
 export const validarClientePerfil = [
