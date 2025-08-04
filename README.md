@@ -4,7 +4,7 @@
 **Estefanía Melisa Sánchez Párraga
 
 ## 📖 Resumen del Proyecto
-sca brindar una interacción más satisfactoria al momento de adquirir sus productos mediante estrategias que resalten el valor de sus productos naturales y personalizados. 
+Flor&Cera es un emprendimiento dedicado a la elaboración de productos artesanales como jabones, aromatizantes y velas, utilizando ingredientes naturales y ecológicos con el propósito de promover el cuidado del medio ambiente. Actualmente, el emprendimiento busca brindar una interacción más satisfactoria al momento de adquirir sus productos mediante estrategias que resalten el valor de sus productos naturales y personalizados. 
 Sin embargo, enfrenta la problemática de no contar con una plataforma tecnológica para comercializar sus productos, ya que solo dispone de un punto de venta físico. 
 Esta limitación reduce su alcance y visibilidad en el mercado, lo cual representa una oportunidad para proponer una solución tecnológica que optimice su presencia digital y mejore su competitividad.
 Con el objetivo de fortalecer el emprendimiento, el presente proyecto de Integración Curricular ha desarrollado un backend para gestionar la venta de productos artesanales. 
