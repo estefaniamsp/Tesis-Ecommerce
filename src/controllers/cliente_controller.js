@@ -513,7 +513,7 @@ const getAllClientes = async (req, res) => {
 
     // Obtener los clientes con paginación
     const clientes = await Clientes.find()
-      .select("-password -token -codigoRecuperacion -codigoRecuperacionExpires")
+      .select("-password -token -codigoRecuperacion -codigoRecuperacionExpires -notificationPushToken")
       .skip(skip)
       .limit(limit);
 
@@ -552,7 +552,7 @@ const getClienteById = async (req, res) => {
   }
 
   try {
-    const cliente = await Clientes.findById(id).select("-password -token -codigoRecuperacion -codigoRecuperacionExpires");
+    const cliente = await Clientes.findById(id).select("-password -token -codigoRecuperacion -codigoRecuperacionExpires -notificationPushToken");
 
     if (!cliente) {
       return res.status(404).json({ msg: "No se encontró ningún cliente con el ID proporcionado.", id });
