@@ -200,8 +200,15 @@ const updateCantidadProductoController = async (req, res) => {
             }
         }
 
-        const nuevaCantidad = carrito.productos[index].cantidad + cantidad;
+        const cantidadActual = carrito.productos[index].cantidad;
+        const nuevaCantidad = cantidadActual + cantidad;
 
+        // ⚠️ Validación para evitar restar más de lo que hay
+        if (cantidad < 0 && Math.abs(cantidad) > cantidadActual) {
+            return res.status(400).json({ msg: `No puedes eliminar más unidades de las que tienes en el carrito (${cantidadActual}).` });
+        }
+
+        // Validar límite superior de stock
         if (tipo_producto === "normal" && nuevaCantidad > producto.stock) {
             return res.status(400).json({ msg: `No puedes agregar más de ${producto.stock} unidades.` });
         }
